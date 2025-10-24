@@ -85,7 +85,11 @@ def camera_page():
         async function letara_start_cam() {
             try {
                 const v = document.getElementById('letara_vid');
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                video:{
+                facingMode: 'environment'
+                }, audio: false 
+                });
                 v.srcObject = stream;
                 return 'ok';
             } catch (e) {
