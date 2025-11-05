@@ -3,7 +3,7 @@ from components.layout import layout
 from pathlib import Path
 from datetime import datetime
 from PIL import Image, ImageFilter
-import io
+import io, asyncio
 
 UPLOAD_DIR = Path('./data/uploads');  UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULT_DIR = Path('./data/results');  RESULT_DIR.mkdir(parents=True, exist_ok=True)
@@ -24,28 +24,33 @@ def _make_result(in_path: Path) -> Path:
     img.save(out_path, format='PNG')
     return out_path
 
-def _get_upload_bytes(e) -> bytes:
-    """Robustly extract bytes for NiceGUI v3 upload event shapes."""
-    if hasattr(e, 'content') and e.content is not None:
-        try:
-            return e.content.read()
-        except Exception:
-            try:
-                e.content.seek(0); return e.content.read()
-            except Exception:
-                pass
-    if hasattr(e, 'file') and e.file is not None:
-        try:
-            return e.file.read()
-        except Exception:
-            try:
-                e.file.seek(0); return e.file.read()
-            except Exception:
-                pass
-    if hasattr(e, 'bytes') and e.bytes is not None:
-        return e.bytes
-    if hasattr(e, 'path') and e.path:
-        return Path(e.path).read_bytes()
+async def _get_upload_bytes_async(e) -> bytes:
+    """Version-proof extractor for NiceGUI 3.x upload event; handles sync/async readers."""
+    # Try common attributes: content / file (Starlette/FastAPI UploadFile-like)
+    for attr in ('content', 'file'):
+        obj = getattr(e, attr, None)
+        if obj is None:
+            continue
+        reader = getattr(obj, 'read', None)
+        if callable(reader):
+            result = reader()
+            if asyncio.iscoroutine(result):         # async read()
+                return await result
+            return result                           # sync read()
+        # sometimes the attribute is already raw bytes
+        if isinstance(obj, (bytes, bytearray, memoryview)):
+            return bytes(obj)
+
+    # Some variants expose bytes directly
+    b = getattr(e, 'bytes', None)
+    if isinstance(b, (bytes, bytearray, memoryview)):
+        return bytes(b)
+
+    # Or a temp file path
+    p = getattr(e, 'path', None)
+    if p:
+        return Path(p).read_bytes()
+
     raise ValueError('Could not read uploaded file bytes from event')
 
 @ui.page('/upload')
@@ -73,7 +78,7 @@ def upload_page():
 
             async def on_upload(e):
                 try:
-                    data = _get_upload_bytes(e)
+                    data = await _get_upload_bytes_async(e)   # <-- await here
                     base = f'letara_{_timestamp()}'
                     in_path  = _save_bytes_to_png(data, UPLOAD_DIR, base)
                     out_path = _make_result(in_path)

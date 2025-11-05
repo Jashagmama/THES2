@@ -6,18 +6,15 @@ from pathlib import Path
 def home_page():
     layout('home')
     ui.label('Welcome to LeTARA!').classes('text-2xl font-bold mt-4 text-[#22c55e]')
-    ui.label('This is the Home page.').classes('text-gray-200')
 
     with ui.row().classes('mt-4 gap-4 flex-wrap'):
-        # Quick Actions
+        
         with ui.card().classes('p-4 bg-[#166534]/70 text-white'):
             ui.icon('home').classes('text-3xl text-[#4ade80]')
             ui.label('Quick Actions').classes('font-semibold')
             ui.button('Go to Profile', on_click=lambda: ui.navigate.to('/profile')).props('color=positive')
             ui.button('Open Camera', on_click=lambda: ui.navigate.to('/camera')).props('color=secondary')
 
-
-        # 👇 NEW: Upload shortcut + recent files
         with ui.card().classes('p-4 bg-[#166534]/70 text-white w-[360px] max-w-full'):
             ui.label('Upload & Results').classes('font-semibold')
             ui.button('Go to Upload Page', on_click=lambda: ui.navigate.to('/upload')).props('color=positive').classes('mb-2')
