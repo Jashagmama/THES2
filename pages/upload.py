@@ -149,7 +149,6 @@ def _make_result(in_path: Path) -> Path:
         return fallback_path
 # ---------------------------- #
 
-
 async def _get_upload_bytes(e) -> bytes:
     """Robustly extract bytes for NiceGUI v3 upload event shapes."""
     if hasattr(e, 'content') and e.content is not None:
