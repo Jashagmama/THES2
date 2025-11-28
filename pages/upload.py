@@ -1,10 +1,19 @@
+from json import load
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+from keras.models import load_model
 from nicegui import ui, run
 from components.layout import layout
 from pathlib import Path
 from datetime import datetime
 from PIL import Image, ImageFilter
+
 import io
 import traceback
+import cv2 as cv
+import numpy as np
+import asyncio
 
 # ---------------------------- #
 # ▼▼▼▼▼▼▼▼▼▼▼ FIX 1 HERE ▼▼▼▼▼▼▼▼▼▼
@@ -25,7 +34,14 @@ try:
         align_documents_sift,
         correct_perspective,
         remove_colored_lines,
-        enhance_handwriting_final
+        count_grid_cells,
+        remove_grid,
+        create_result,
+        eval_letters,
+        init_boxes,
+        check_page,
+        template_char_check
+        # enhance_handwriting_final
     )
     PIPELINE_AVAILABLE = True
 except ImportError as e:
@@ -35,7 +51,7 @@ except ImportError as e:
 
 UPLOAD_DIR = Path('./data/uploads');  UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULT_DIR = Path('./data/results');  RESULT_DIR.mkdir(parents=True, exist_ok=True)
-TEMPLATE_PATH = "pictures/template.png" # Path to your template, relative to main.py
+TEMPLATE_PATH = "./template/A-J.png" # Path to your template, relative to main.py
 
 def _timestamp() -> str:
     return datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -67,22 +83,60 @@ def _make_result(in_path: Path) -> Path:
     
     # Define intermediate/final paths
     ts = in_path.stem # e.g., 'letara_20251114_133000'
-    step1_path = RESULT_DIR / f"{ts}_1_skewed.png"
-    step2_path = RESULT_DIR / f"{ts}_2_sift.png"
-    step3_path = RESULT_DIR / f"{ts}_3_corrTab.png"
-    step4_path = RESULT_DIR / f"{ts}_4_no_red.png"
-    out_path   = RESULT_DIR / f"{ts}_5_final_enhanced.png" # This is the final "result"
+    # step1_path = RESULT_DIR / f"{ts}_1_skewed.png"
+    # step2_path = RESULT_DIR / f"{ts}_2_sift.png"
+    # step3_path = RESULT_DIR / f"{ts}_3_corrTab.png"
+    # step4_path = RESULT_DIR / f"{ts}_4_no_red.png"
+    loaded_model = load_model('./model/handwriting_MNIST.keras')
     
     try:
         # Run the pipeline steps
-        s1 = correct_skew(str(in_path), str(step1_path))
-        s2 = align_documents_sift(TEMPLATE_PATH, s1, str(step2_path))
-        s3 = correct_perspective(s2, str(step3_path))
-        s4 = remove_colored_lines(s3, str(step4_path))
-        s5 = enhance_handwriting_final(s4, str(out_path))
+        # s1 = correct_skew(str(in_path), str(step1_path))
+        template_path = "./template/A-J.png"
+        dummy_input = np.random.rand(1, 28, 28, 1).astype('float32')
+        try:
+            # dummy_output = await asyncio.to_thread(loaded_model.predict, dummy_input)
+            dummy_output = asyncio.run(asyncio.to_thread(loaded_model.predict, dummy_input))
+            # dummy_output = loaded_model.predict(dummy_input, verbose=0)
+            print(f"Dummy prediction successful! Output shape: {dummy_output.shape}")
+        except Exception as e:
+            print(f"Error with dummy prediction: {e}")
+
+        template_img = cv.imread(TEMPLATE_PATH)
+        ws_img = cv.imread(str(in_path))
+
+        boxes = init_boxes()
+        # sift_aligned = align_documents_sift(template_img, ws_img, "2_sift.png")
+        # s2 = align_documents_sift(TEMPLATE_PATH, s1, str(step2_path))
+        # s3 = correct_perspective(s2, str(step3_path))
+        # s4 = remove_colored_lines(s3, str(step4_path))
+        # s5 = enhance_handwriting_final(s4, str(out_path))
         
-        print(f"--- Pipeline complete. Result: {s5} ---")
-        return Path(s5) # Return the final path
+        print("\n--- SIFT Alignment ---")
+        sift_aligned = align_documents_sift(template_img, ws_img, "2_sift.png")
+        red_removed = remove_colored_lines(sift_aligned, "4_no_red.png")
+
+        num_enclosed = count_grid_cells(sift_aligned)
+
+        print("\n--- Perspective Correction ---")
+# perspective_corrected = correct_perspective(sift_aligned, "3_corrTab.png")
+        perspective_corrected = correct_perspective(sift_aligned, num_enclosed, "3_corrTab.png")
+        char_set = check_page(red_removed)
+        print(f"chars: {char_set}")
+
+
+        grid_removed = remove_grid(perspective_corrected)
+        print("\n--- Remove Red Lines ---")
+# show_img(sharpen, 'sharpened')
+        image_processed = remove_colored_lines(grid_removed, "4_no_red.png")
+
+        print("\n--- Eval Letters ---")
+        eval_letters(image_processed, boxes, char_set) 
+
+        res_img = create_result(perspective_corrected, boxes.letters, out_path)
+        # show_img(res_img, 'result')
+        print(f"--- Pipeline complete. Result: {out_path} ---")
+        return Path(out_path) # Return the final path
     
     except Exception as e:
         print(f"❌ Pipeline failed for {in_path.name}: {e}")
