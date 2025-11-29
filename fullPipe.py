@@ -596,6 +596,7 @@ def eval_letters(img: MatLike, box, char_set):
     unprocessed_imgs = []
     orientation_fixed = []
     eval_preproc = []
+    imgs = []
     for i in range (0, num_row):
         exp_char = char_set[i]
         char_conf_lvl = 0
