@@ -16,3 +16,6 @@ data/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# jupyterlab
+.ipynb_checkpoints

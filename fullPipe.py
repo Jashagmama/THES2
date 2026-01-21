@@ -3,7 +3,6 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import box_man
 
-from cv2.typing import MatLike
 from math import ceil
 from jdeskew.estimator import get_angle
 from jdeskew.utility import rotate
@@ -11,8 +10,8 @@ from skimage.filters import threshold_sauvola
 
 
 # Typings
-from cv2.typing import MatLike
 from numpy.typing import NDArray
+from cv2.typing import MatLike
 
 # keras
 from keras.models import load_model
