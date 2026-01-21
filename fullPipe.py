@@ -499,6 +499,29 @@ def correct_perspective(image: MatLike, num_enclosed: int, output_path: str="3_c
     print(f"✅ Perspective correction done -> {output_path}")
     return corrected
 
+'''
+A simple function that removes shadows from 
+https://stackoverflow.com/questions/44752240/how-to-remove-shadow-from-scanned-images-using-opencv
+'''
+
+def remove_shadow(img: MatLike) -> MatLike:
+    rgb_planes = cv.split(img)
+    result_planes = []
+    result_norm_planes = []
+    for plane in planes:
+        dilated_img = cv.dilate(plane, np.ones(7,7), np.uint8)
+        bg_img = cv.medianBlur(dilated_img, 21)
+        diff_img = 255 - cv.absdiff(plane, bg_img)
+        norm_img = cv.normalize(diff_img, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8UC1)
+        result_planes.append(diff_img)
+        result_norm_planes.append(norm_img)
+
+    result = cv.merge(result_planes)
+    result_norm = cv.merge(result_norm_planes)
+
+    return result_norm
+
+
 # ---------------------------- #
 # Step 4: Remove Red Lines
 # ---------------------------- #

@@ -19,3 +19,6 @@ Thumbs.db
 
 # jupyterlab
 .ipynb_checkpoints
+
+# project images
+letara*.png

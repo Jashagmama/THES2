@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,13 +26,13 @@ SECRET_KEY = "django-insecure-(uz&f*(ns2quch-fm=p^5mx1sbe$5t2g-3&%a%@5&bk3+_(du7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    "letara"
+    "letara",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -116,3 +117,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+# Build paths inside the project
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Maximum upload file size (10MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760
+
+# Allowed image formats
+ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']

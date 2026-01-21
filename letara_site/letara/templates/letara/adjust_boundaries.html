@@ -1,0 +1,404 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adjust Document Boundaries</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f5f5;
+        }
+        .boundary-container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        #imageCanvas {
+            border: 2px solid #ddd;
+            cursor: crosshair;
+            max-width: 100%;
+            display: block;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        .controls {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .coord-display {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .btn-group-custom {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .overlay-rect {
+            fill: rgba(33, 150, 243, 0.2);
+            stroke: #2196F3;
+            stroke-width: 3;
+        }
+        .corner-handle {
+            fill: #2196F3;
+            stroke: white;
+            stroke-width: 2;
+            cursor: move;
+        }
+    </style>
+</head>
+<body>
+    <div class="container boundary-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>📐 Adjust Document Boundaries</h1>
+            <a href="{% url 'document_scanner' %}" class="btn btn-outline-secondary">
+                ← Back to Scanner
+            </a>
+        </div>
+
+        <div class="instructions">
+            <h5>📝 Instructions:</h5>
+            <ol class="mb-0">
+                <li><strong>Click and drag</strong> on the image to draw a rectangle around your worksheet</li>
+                <li><strong>Drag the corners</strong> to adjust the boundaries precisely</li>
+                <li>Click <strong>"Apply Crop"</strong> when satisfied, or <strong>"Skip"</strong> to use the full image</li>
+                <li>The cropped area will be used for grading</li>
+            </ol>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="canvas-wrapper">
+                    <canvas id="imageCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="controls">
+                    <h5>Controls</h5>
+                    <div class="coord-display" id="coordDisplay">
+                        <strong>Selection:</strong><br>
+                        Top-Left: (-, -)<br>
+                        Bottom-Right: (-, -)
+                    </div>
+                    
+                    <div class="btn-group-custom mt-3">
+                        <button class="btn btn-primary flex-fill" id="applyCropBtn" disabled>
+                            ✓ Apply Crop
+                        </button>
+                        <button class="btn btn-warning flex-fill" id="resetBtn">
+                            🔄 Reset
+                        </button>
+                    </div>
+                    
+                    <button class="btn btn-secondary w-100 mt-2" id="skipBtn">
+                        Skip Cropping
+                    </button>
+                    
+                    <div class="mt-4">
+                        <h6>Tips:</h6>
+                        <ul class="small">
+                            <li>Ensure all answers are within the boundary</li>
+                            <li>Remove unnecessary borders</li>
+                            <li>Keep text clearly visible</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const canvas = document.getElementById('imageCanvas');
+        const ctx = canvas.getContext('2d');
+        const applyCropBtn = document.getElementById('applyCropBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const skipBtn = document.getElementById('skipBtn');
+        const coordDisplay = document.getElementById('coordDisplay');
+        
+        let img = new Image();
+        let isDrawing = false;
+        let isDragging = false;
+        let dragCorner = null;
+        let startX, startY, endX, endY;
+        let rect = null;
+        const cornerRadius = 8;
+        
+        // Load image
+        img.src = "{{ document.original_image.url }}";
+        img.onload = function() {
+            // Set canvas size to image size (with max width)
+            const maxWidth = 800;
+            const scale = Math.min(1, maxWidth / img.width);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            
+            drawImage();
+            
+            // Auto-suggest full image boundaries
+            rect = {
+                x1: canvas.width * 0.05,
+                y1: canvas.height * 0.05,
+                x2: canvas.width * 0.95,
+                y2: canvas.height * 0.95
+            };
+            drawImage();
+            applyCropBtn.disabled = false;
+        };
+        
+        function drawImage() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            if (rect) {
+                drawRectangle(rect.x1, rect.y1, rect.x2, rect.y2);
+                updateCoordDisplay();
+            }
+        }
+        
+        function drawRectangle(x1, y1, x2, y2) {
+            // Draw semi-transparent overlay
+            ctx.fillStyle = 'rgba(33, 150, 243, 0.2)';
+            ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+            
+            // Draw border
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+            
+            // Draw corner handles
+            const corners = [
+                {x: x1, y: y1},
+                {x: x2, y: y1},
+                {x: x1, y: y2},
+                {x: x2, y: y2}
+            ];
+            
+            corners.forEach(corner => {
+                ctx.fillStyle = '#2196F3';
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(corner.x, corner.y, cornerRadius, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) * (canvas.width / rect.width),
+                y: (e.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+        
+        function getCornerUnderMouse(x, y) {
+            if (!rect) return null;
+            
+            const corners = [
+                {name: 'topLeft', x: rect.x1, y: rect.y1},
+                {name: 'topRight', x: rect.x2, y: rect.y1},
+                {name: 'bottomLeft', x: rect.x1, y: rect.y2},
+                {name: 'bottomRight', x: rect.x2, y: rect.y2}
+            ];
+            
+            for (let corner of corners) {
+                const dist = Math.sqrt(Math.pow(x - corner.x, 2) + Math.pow(y - corner.y, 2));
+                if (dist <= cornerRadius + 5) {
+                    return corner.name;
+                }
+            }
+            return null;
+        }
+        
+        function updateCoordDisplay() {
+            if (rect) {
+                const scale = img.width / canvas.width;
+                const realX1 = Math.round(rect.x1 * scale);
+                const realY1 = Math.round(rect.y1 * scale);
+                const realX2 = Math.round(rect.x2 * scale);
+                const realY2 = Math.round(rect.y2 * scale);
+                
+                coordDisplay.innerHTML = `
+                    <strong>Selection:</strong><br>
+                    Top-Left: (${realX1}, ${realY1})<br>
+                    Bottom-Right: (${realX2}, ${realY2})<br>
+                    Size: ${realX2 - realX1} × ${realY2 - realY1}
+                `;
+            }
+        }
+        
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            const corner = getCornerUnderMouse(pos.x, pos.y);
+            
+            if (corner) {
+                isDragging = true;
+                dragCorner = corner;
+            } else {
+                isDrawing = true;
+                startX = pos.x;
+                startY = pos.y;
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const pos = getMousePos(e);
+            
+            if (isDragging && dragCorner && rect) {
+                // Update corner position
+                switch(dragCorner) {
+                    case 'topLeft':
+                        rect.x1 = pos.x;
+                        rect.y1 = pos.y;
+                        break;
+                    case 'topRight':
+                        rect.x2 = pos.x;
+                        rect.y1 = pos.y;
+                        break;
+                    case 'bottomLeft':
+                        rect.x1 = pos.x;
+                        rect.y2 = pos.y;
+                        break;
+                    case 'bottomRight':
+                        rect.x2 = pos.x;
+                        rect.y2 = pos.y;
+                        break;
+                }
+                
+                // Ensure x1 < x2 and y1 < y2
+                if (rect.x1 > rect.x2) [rect.x1, rect.x2] = [rect.x2, rect.x1];
+                if (rect.y1 > rect.y2) [rect.y1, rect.y2] = [rect.y2, rect.y1];
+                
+                drawImage();
+            } else if (isDrawing) {
+                endX = pos.x;
+                endY = pos.y;
+                
+                drawImage();
+                drawRectangle(startX, startY, endX, endY);
+            } else {
+                // Change cursor if over corner
+                const corner = getCornerUnderMouse(pos.x, pos.y);
+                canvas.style.cursor = corner ? 'move' : 'crosshair';
+            }
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            if (isDrawing) {
+                const pos = getMousePos(e);
+                endX = pos.x;
+                endY = pos.y;
+                
+                rect = {
+                    x1: Math.min(startX, endX),
+                    y1: Math.min(startY, endY),
+                    x2: Math.max(startX, endX),
+                    y2: Math.max(startY, endY)
+                };
+                
+                drawImage();
+                applyCropBtn.disabled = false;
+            }
+            
+            isDrawing = false;
+            isDragging = false;
+            dragCorner = null;
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            rect = {
+                x1: canvas.width * 0.05,
+                y1: canvas.height * 0.05,
+                x2: canvas.width * 0.95,
+                y2: canvas.height * 0.95
+            };
+            drawImage();
+        });
+        
+        applyCropBtn.addEventListener('click', async () => {
+            if (!rect) return;
+            
+            applyCropBtn.disabled = true;
+            applyCropBtn.innerHTML = '⏳ Processing...';
+            
+            const scale = img.width / canvas.width;
+            const cropData = {
+                x1: Math.round(rect.x1 * scale),
+                y1: Math.round(rect.y1 * scale),
+                x2: Math.round(rect.x2 * scale),
+                y2: Math.round(rect.y2 * scale)
+            };
+            
+            try {
+                const response = await fetch("{% url 'apply_crop' document.pk %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify(cropData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert('Error: ' + data.message);
+                    applyCropBtn.disabled = false;
+                    applyCropBtn.innerHTML = '✓ Apply Crop';
+                }
+            } catch (error) {
+                alert('Error applying crop: ' + error);
+                applyCropBtn.disabled = false;
+                applyCropBtn.innerHTML = '✓ Apply Crop';
+            }
+        });
+        
+        skipBtn.addEventListener('click', async () => {
+            if (confirm('Skip cropping and use the full image?')) {
+                try {
+                    const response = await fetch("{% url 'skip_crop' document.pk %}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.href = data.redirect_url;
+                    }
+                } catch (error) {
+                    alert('Error: ' + error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

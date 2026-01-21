@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ document.title|default:"Document Detail" }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .document-detail {
+            max-width: 900px;
+            margin: 50px auto;
+        }
+        .document-image-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .document-image-full {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .info-table {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container document-detail">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ document.title|default:"Untitled Document" }}</h1>
+            <div>
+                <a href="{% url 'document_list' %}" class="btn btn-secondary">
+                    ← Back to List
+                </a>
+                <a href="{% url 'document_scanner' %}" class="btn btn-primary">
+                    ➕ New Scan
+                </a>
+            </div>
+        </div>
+
+        <div class="document-image-container">
+            <img src="{{ document.image.url }}" alt="{{ document.title }}" class="document-image-full">
+        </div>
+
+        <table class="table table-bordered info-table">
+            <tbody>
+                <tr>
+                    <th style="width: 200px;">Upload Method</th>
+                    <td>
+                        <span class="badge {% if document.upload_method == 'camera' %}bg-primary{% else %}bg-success{% endif %}">
+                            {% if document.upload_method == 'camera' %}📷 Camera Capture{% else %}📁 File Upload{% endif %}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Uploaded At</th>
+                    <td>{{ document.uploaded_at|date:"F d, Y H:i:s" }}</td>
+                </tr>
+                <tr>
+                    <th>File Size</th>
+                    <td>{{ document.file_size|filesizeformat }}</td>
+                </tr>
+                <tr>
+                    <th>File Path</th>
+                    <td><code>{{ document.image.name }}</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="text-center mt-4">
+            <a href="{{ document.image.url }}" download class="btn btn-success">
+                ⬇ Download Document
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

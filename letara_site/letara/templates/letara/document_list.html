@@ -1,0 +1,106 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .document-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .document-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .document-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .document-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        .document-info {
+            padding: 15px;
+        }
+        .badge-method {
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Scanned Documents</h1>
+            <a href="{% url 'document_scanner' %}" class="btn btn-primary">
+                ➕ New Scan
+            </a>
+        </div>
+
+        {% if documents %}
+            <div class="document-grid">
+                {% for document in documents %}
+                    <a href="{% url 'document_detail' document.pk %}" class="text-decoration-none">
+                        <div class="document-card">
+                            <img src="{{ document.image.url }}" alt="{{ document.title }}" class="document-image">
+                            <div class="document-info">
+                                <h5 class="card-title">{{ document.title|default:"Untitled Document" }}</h5>
+                                <p class="text-muted small mb-2">{{ document.uploaded_at|date:"M d, Y H:i" }}</p>
+                                <span class="badge {% if document.upload_method == 'camera' %}bg-primary{% else %}bg-success{% endif %} badge-method">
+                                    {% if document.upload_method == 'camera' %}📷 Camera{% else %}📁 Upload{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+
+            {% if is_paginated %}
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-info text-center">
+                <h4>No documents yet</h4>
+                <p>Start scanning documents using your camera or upload existing images.</p>
+                <a href="{% url 'document_scanner' %}" class="btn btn-primary mt-3">
+                    📸 Scan Your First Document
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
