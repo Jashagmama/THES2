@@ -1,19 +1,29 @@
 {% extends "base.html" %}
-{% block content %}
+{% block title %}Upload & Results{% endblock %}
 
+{% block content %}
 <h2>Upload & Results</h2>
 
 <form method="post" enctype="multipart/form-data">
-  {% csrf_token %}
-  <input type="file" name="image" accept="image/*">
-  <button type="submit">Upload</button>
+    {% csrf_token %}
+
+    <label for="image">Select an image</label>
+    <input type="file" id="image" name="image" accept="image/*" required>
+
+    <button type="submit">Upload</button>
 </form>
 
 {% if input_path %}
-<p>Input: {{ input_path }}</p>
-<img src="/{{ input_path }}">
-<p>Result: {{ output_path }}</p>
-<img src="/{{ output_path }}">
-{% endif %}
+    <h3>Processing Result</h3>
 
+    <div class="image-grid">
+        <div class="image-card">
+            <img src="/{{ input_path }}" alt="Uploaded image">
+        </div>
+
+        <div class="image-card">
+            <img src="/{{ output_path }}" alt="Processed result">
+        </div>
+    </div>
+{% endif %}
 {% endblock %}

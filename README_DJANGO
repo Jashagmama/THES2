@@ -1,0 +1,89 @@
+# LeTARA – Django Web Application
+
+LeTARA is a Django-based web application that provides:
+- A home dashboard
+- A profile page
+- Camera capture via browser
+- Image upload with a processing pipeline
+
+This README explains **how to run the website locally** using Django.
+
+---
+
+## 📦 Requirements
+
+Make sure you have the following installed:
+
+- **Python 3.10+**
+- **pip** (comes with Python)
+- **Virtual environment support** (recommended)
+
+Check installation:
+```bat
+python --version
+pip --version
+
+letara/
+├── letara/          # Django project settings
+├── app/             # Main Django app
+├── data/            # Uploaded, processed, and captured images
+├── manage.py
+└── README.md
+
+=================================================================================
+
+🚀 How to Run the Website (Windows CMD)
+1️⃣ Open Command Prompt
+
+Navigate to the project root (where manage.py is):
+
+cd path\to\letara
+
+2️⃣ (Optional but Recommended) Activate Virtual Environment
+
+If you already created a virtual environment:
+
+venv\Scripts\activate
+
+
+You should see (venv) in the terminal.
+
+If you don’t have one yet:
+
+python -m venv venv
+venv\Scripts\activate
+
+3️⃣ Install Dependencies
+pip install django pillow
+
+
+(Install other dependencies here if your pipeline requires them.)
+
+4️⃣ Run the Django Development Server
+python manage.py runserver
+
+
+If successful, you will see:
+
+Starting development server at http://127.0.0.1:8000/
+
+5️⃣ Open the Website in Your Browser 🌐
+
+Visit:
+
+http://127.0.0.1:8000/
+
+ =================================================================================
+
+🔗 Available Pages
+Page	URL
+Home	/
+Profile	/profile/
+Camera	/camera/
+Upload	/upload/
+
+Example:
+
+http://127.0.0.1:8000/profile/
+
+ 

@@ -4,20 +4,30 @@
 {% block content %}
 <h2>Welcome to LeTARA!</h2>
 
-<div>
-    <a href="{% url 'profile' %}">Go to Profile</a>
-    <a href="{% url 'camera' %}">Open Camera</a>
-    <a href="{% url 'upload' %}">Upload Image</a>
+<p>
+    Handwritten Text Recognition made easy. Use the buttons below to get started.
+</p>
+
+<!-- ACTION BUTTONS -->
+<div style="margin: 1.5rem 0; display: flex; gap: 1rem; flex-wrap: wrap;">
+    <a href="{% url 'profile' %}" class="btn">Go to Profile</a>
+    <a href="{% url 'camera' %}" class="btn">Open Camera</a>
+    <a href="{% url 'upload' %}" class="btn">Upload Image</a>
 </div>
 
-<h4>Recent uploads</h4>
-<ul>
-    {% if uploads %}
+
+<!-- RECENT UPLOADS -->
+<h3>Recent Uploads</h3>
+
+{% if uploads %}
+    <ul style="margin-top: 1rem; padding-left: 1.2rem;">
         {% for p in uploads %}
             <li>{{ p.name }}</li>
         {% endfor %}
-    {% else %}
-        <li>No uploads yet.</li>
-    {% endif %}
-</ul>
+    </ul>
+{% else %}
+    <div class="alert-success" style="margin-top: 1rem;">
+        No uploads yet.
+    </div>
+{% endif %}
 {% endblock %}

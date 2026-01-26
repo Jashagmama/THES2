@@ -1,13 +1,37 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}LeTARA{% endblock %}</title>
+
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
 
-    {% block content %}
-    {% endblock %}
+    <!-- HEADER / NAVBAR -->
+    <header>
+        <h1>LeTARA</h1>
+        <nav>
+            <a href="{% url 'home' %}">Home</a>
+            <a href="{% url 'upload' %}">Upload</a>
+            <a href="{% url 'camera' %}">Camera</a>
+            <a href="{% url 'profile' %}">Profile</a>
+        </nav>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="container">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>&copy; {{ year|default:"2026" }} LeTARA. All rights reserved.</p>
+    </footer>
 
 </body>
 </html>
