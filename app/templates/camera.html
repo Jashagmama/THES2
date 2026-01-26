@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Camera</h2>
+
+<video id="vid" autoplay playsinline></video>
+<button onclick="startCam()">Start Camera</button>
+<button onclick="capture()">Take Picture</button>
+
+<img id="preview">
+<input id="path" readonly>
+
+<canvas id="can" hidden></canvas>
+
+<script>
+async function startCam() {
+  const stream = await navigator.mediaDevices.getUserMedia({video:true});
+  document.getElementById('vid').srcObject = stream;
+}
+
+async function capture() {
+  const v = document.getElementById('vid');
+  const c = document.getElementById('can');
+  c.width = v.videoWidth;
+  c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+
+  const data = c.toDataURL('image/png');
+  const res = await fetch('/camera/save/', {
+    method:'POST',
+    headers:{'X-CSRFToken':'{{ csrf_token }}'},
+    body:new URLSearchParams({image:data})
+  });
+
+  const json = await res.json();
+  document.getElementById('preview').src = '/' + json.path;
+  document.getElementById('path').value = json.path;
+}
+</script>
+
+{% endblock %}

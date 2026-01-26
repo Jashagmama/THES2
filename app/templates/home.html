@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<h2>Welcome to LeTARA!</h2>
+
+<div>
+    <a href="{% url 'profile' %}">Go to Profile</a>
+    <a href="{% url 'camera' %}">Open Camera</a>
+    <a href="{% url 'upload' %}">Upload Image</a>
+</div>
+
+<h4>Recent uploads</h4>
+<ul>
+    {% if uploads %}
+        {% for p in uploads %}
+            <li>{{ p.name }}</li>
+        {% endfor %}
+    {% else %}
+        <li>No uploads yet.</li>
+    {% endif %}
+</ul>
+{% endblock %}
