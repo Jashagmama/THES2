@@ -8,5 +8,6 @@ dependencies = [
     "Django",
     "tensorflow",
     "opencv-python",
-    "jdeskew"
+    "jdeskew",
+    "Pillow"
 ]
