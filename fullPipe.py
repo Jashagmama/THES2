@@ -25,7 +25,6 @@ word_dict = {
     15:'P',16:'Q',17:'R',18:'S',19:'T',20:'U',21:'V',22:'W',23:'X', 24:'Y',25:'Z'
 }
 
-
 def plot_imgs(imgs: list, n_row, n_col, file_name=''):
     plt.close('all')  # Close any existing figures FIRST
     
@@ -188,7 +187,7 @@ def img_format(img: MatLike) -> MatLike: # formatting for character recoginition
 
     return formatted_img
 
-def count_grid_cells(img):
+def count_grid_cells(img) -> int:
     """
     Automatically detects and counts grid cells in the image.
     Returns the number of cells found.
@@ -508,8 +507,8 @@ def remove_shadow(img: MatLike) -> MatLike:
     rgb_planes = cv.split(img)
     result_planes = []
     result_norm_planes = []
-    for plane in planes:
-        dilated_img = cv.dilate(plane, np.ones(7,7), np.uint8)
+    for plane in rgb_planes:
+        dilated_img = cv.dilate(plane, np.ones((15,15), np.uint8))
         bg_img = cv.medianBlur(dilated_img, 21)
         diff_img = 255 - cv.absdiff(plane, bg_img)
         norm_img = cv.normalize(diff_img, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8UC1)

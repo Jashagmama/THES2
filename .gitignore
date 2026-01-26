@@ -19,6 +19,17 @@ Thumbs.db
 
 # jupyterlab
 .ipynb_checkpoints
+.virtul_documents/
 
 # project images
 letara*.png
+
+# Output images
+2_sift.png
+3_corrTab.png
+4_no_red.png
+eval_box.png
+final_res.png
+
+# Backup files
+*.bak

@@ -1,0 +1,62 @@
+<style>
+body {
+    background-color: #f5f5f5;
+}
+.boundary-container {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 20px;
+}
+.canvas-wrapper {
+    position: relative;
+    display: inline-block;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+#imageCanvas {
+    border: 2px solid #ddd;
+    cursor: crosshair;
+    max-width: 100%;
+    display: block;
+}
+.instructions {
+    background: #e3f2fd;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #2196F3;
+}
+.controls {
+    margin-top: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.coord-display {
+    font-family: monospace;
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+.btn-group-custom {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.overlay-rect {
+    fill: rgba(33, 150, 243, 0.2);
+    stroke: #2196F3;
+    stroke-width: 3;
+}
+.corner-handle {
+    fill: #2196F3;
+    stroke: white;
+    stroke-width: 2;
+    cursor: move;
+}
+</style>
