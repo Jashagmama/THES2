@@ -749,6 +749,7 @@ dependencies = [
     { name = "django" },
     { name = "jdeskew" },
     { name = "opencv-python" },
+    { name = "pillow" },
     { name = "tensorflow" },
 ]
 
@@ -757,6 +758,7 @@ requires-dist = [
     { name = "django" },
     { name = "jdeskew" },
     { name = "opencv-python" },
+    { name = "pillow" },
     { name = "tensorflow" },
 ]
 

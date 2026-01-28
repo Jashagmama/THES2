@@ -1,5 +1,8 @@
+from django.core import validators
 from django.db import models
+from django.forms import FloatField
 from django.utils import timezone
+from django.core.validators import MaxValueValidator, MinValueValidator
 from PIL import Image, ImageDraw
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -21,6 +24,7 @@ class ScannedDocument(models.Model):
     # Store crop coordinates as JSON
     crop_coordinates = models.JSONField(null=True, blank=True)
     is_cropped = models.BooleanField(default=False)
+    is_graded = models.BooleanField(default=False)
     
     class Meta:
         ordering = ['-uploaded_at']
@@ -81,3 +85,64 @@ class ScannedDocument(models.Model):
         if self.original_image and not self.file_size:
             self.file_size = self.original_image.size
         super().save(*args, **kwargs)
+
+
+class HandwritingGrade(models.Model):
+    document = models.OneToOneField(
+        ScannedDocument,
+        on_delete=models.CASCADE,
+        related_name='hw_grade',
+    )
+
+    letter_form = models.FloatField(
+        validators=[validators.MinValueValidator(0), validators.MaxValueValidator(100)],
+        help_text="Quality of letter formation"
+    )
+
+    size = models.FloatField(
+        validators=[validators.MinValueValidator(0), validators.MaxValueValidator(100)],
+        help_text="Letter size in relation to template character size"
+    )
+
+    line_align = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Alignment with baseline and proper spacing"
+    )
+    orientation = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Proper slant and angle of letters"
+    )
+
+    # Overall grade (auto-calculated or manual)
+    overall_score = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Overall handwriting score"
+    )
+
+    graded_at = models.DateTimeField(auto_now_add=True)
+
+    comments = models.TextField(blank=True, help_text="Detailed feedback for the student")
+    strengths = models.TextField(blank=True, help_text="What the student does well")
+    areas_for_improvement = models.TextField(blank=True, help_text="Areas that need work")
+
+    def __str__(self):
+        return f"Grade for {self.document.title or f'Worksheet {self.document.id}'}"
+
+    def get_overall_score(self):
+        """Calculate overall score from individual criteria"""
+        if self.overall_score is not None:
+            return self.overall_score
+
+        # Calculate weighted average
+        criteria = [self.letter_form, self.size, self.line_align, self.orientation]
+        weights = [0.3, 0.25, 0.25, 0.2]  # Adjust weights as needed
+
+        # Normalize weights to sum to 1
+        total_weight = sum(weights[:len(criteria)])
+        normalized_weights = [w / total_weight for w in weights[:len(criteria)]]
+
+        # Calculate weighted score
+        score = sum(c * w for c, w in zip(criteria, normalized_weights))
+        return round(score, 2)
+

@@ -9,6 +9,8 @@ import json
 from .models import ScannedDocument
 from .forms import DocumentUploadForm, CameraCaptureForm, CropForm
 
+from . import fullPipe
+
 def document_scanner(request):
     """Main view for document scanning with camera or upload options"""
     upload_form = DocumentUploadForm()
