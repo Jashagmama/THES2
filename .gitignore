@@ -23,6 +23,8 @@ Thumbs.db
 
 # project images
 letara*.png
+letara_site/media/*
+letara_site/letara/migrations/*
 
 # Output images
 2_sift.png

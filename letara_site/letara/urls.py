@@ -9,4 +9,6 @@ urlpatterns = [
     path('documents/', views.DocumentListView.as_view(), name='document_list'),
     path('document/<int:pk>/', views.DocumentDetailView.as_view(), name='document_detail'),
     path('document/<int:pk>/delete/', views.delete_document, name='delete_document'),
+    path('document/<int:pk>/grade/', views.grade_worksheet, name='grade_worksheet'),
+    path('document/<int:pk>/auto-grade/', views.auto_grade_worksheet, name='auto_grade_worksheet'),
 ]

@@ -160,14 +160,13 @@
         </div>
 
         <div class="text-center mt-4">
-            <a href="{% url 'document_list' %}" class="btn btn-outline-primary">
+            <a href="{% url 'document_list' %}" class="btn btn-outline-primary" onclick="return true;">
                 📋 View All Documents
             </a>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src={% static "js/document_scanner.html" %}></script>
     <script>
         const cameraCard = document.getElementById('cameraCard');
         const uploadCard = document.getElementById('uploadCard');
@@ -182,18 +181,23 @@
         const cameraForm = document.getElementById('cameraForm');
         const uploadForm = document.getElementById('uploadForm');
         const uploadPreview = document.getElementById('uploadPreview');
+        const instructionAlert = document.getElementById('instructionAlert');
         
         let stream = null;
 
+        console.log('Script loaded'); // Debug
+
         // Camera card click
         cameraCard.addEventListener('click', async () => {
+            console.log('Camera card clicked'); // Debug
             cameraCard.classList.add('active');
             uploadCard.classList.remove('active');
             cameraSection.style.display = 'block';
             uploadSection.style.display = 'none';
-            document.getElementById('instructionAlert').style.display = 'none';
+            if (instructionAlert) instructionAlert.style.display = 'none';
             
-            document.querySelector('[name="upload_method"]', cameraForm).value = 'camera';
+            const uploadMethodInput = cameraForm.querySelector('[name="upload_method"]');
+            if (uploadMethodInput) uploadMethodInput.value = 'camera';
             
             // Start camera
             try {
@@ -208,13 +212,15 @@
 
         // Upload card click
         uploadCard.addEventListener('click', () => {
+            console.log('Upload card clicked'); // Debug
             uploadCard.classList.add('active');
             cameraCard.classList.remove('active');
             uploadSection.style.display = 'block';
             cameraSection.style.display = 'none';
-            document.getElementById('instructionAlert').style.display = 'none';
+            if (instructionAlert) instructionAlert.style.display = 'none';
             
-            document.querySelector('[name="upload_method"]', uploadForm).value = 'upload';
+            const uploadMethodInput = uploadForm.querySelector('[name="upload_method"]');
+            if (uploadMethodInput) uploadMethodInput.value = 'upload';
             
             // Stop camera if running
             stopCamera();
@@ -272,17 +278,20 @@
         });
 
         // Upload preview
-        document.querySelector('[name="original_image"]').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    uploadPreview.src = e.target.result;
-                    uploadPreview.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+        const imageInput = document.querySelector('[name="original_image"]');
+        if (imageInput) {
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        uploadPreview.src = e.target.result;
+                        uploadPreview.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
 
         function stopCamera() {
             if (stream) {
@@ -296,7 +305,7 @@
             uploadCard.classList.remove('active');
             cameraSection.style.display = 'none';
             uploadSection.style.display = 'none';
-            document.getElementById('instructionAlert').style.display = 'block';
+            if (instructionAlert) instructionAlert.style.display = 'block';
             previewImage.style.display = 'none';
             videoElement.style.display = 'block';
             captureBtn.style.display = 'inline-block';

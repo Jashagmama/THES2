@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.conf.global_settings import CSRF_TRUSTED_ORIGINS, STATICFILES_DIRS
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -131,3 +133,11 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760
 
 # Allowed image formats
 ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+
+# Static files 
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+# CSRF
+CSRF_TRUSTED_ORIGINS = ['https://209a002336f2bc.lhr.life/', 'https://209a002336f2bc.lhr.life', 'https://*.lhr.life', 'https://strong-donkeys-study.loca.lt/', 'https://*.loca.lt']

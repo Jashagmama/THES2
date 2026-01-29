@@ -55,8 +55,10 @@
                 <tr>
                     <th style="width: 200px;">Status</th>
                     <td>
-                        {% if document.is_cropped %}
-                            <span class="badge bg-success">✓ Cropped & Ready</span>
+                        {% if document.is_graded %}
+                            <span class="badge bg-success">✓ Graded</span>
+                        {% elif document.is_cropped %}
+                            <span class="badge bg-info">✓ Cropped & Ready</span>
                         {% else %}
                             <span class="badge bg-warning">⚠ Using Original Image</span>
                         {% endif %}
@@ -96,12 +98,170 @@
             </tbody>
         </table>
 
+        {% if document.is_graded %}
+        <!-- Grading Results Section -->
+        <div class="card mt-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">📊 Handwriting Assessment Results</h5>
+            </div>
+            <div class="card-body">
+                {% if document.worksheet_summary %}
+                    {% with summary=document.worksheet_summary %}
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="text-center p-4 bg-light rounded">
+                                <h2 class="display-3 mb-0">{{ summary.overall_score|floatformat:1 }}</h2>
+                                <p class="text-muted mb-0">Overall Score</p>
+                                <h3 class="mt-2">{{ summary.get_letter_grade }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <h6>Overall Criteria Averages:</h6>
+                            <ul class="list-group">
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>✍️ Letter Formation</span>
+                                    <strong>{{ summary.overall_letter_form|floatformat:1 }}/100</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>📏 Size</span>
+                                    <strong>{{ summary.overall_size|floatformat:1 }}/100</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>📐 Line Alignment</span>
+                                    <strong>{{ summary.overall_line_align|floatformat:1 }}/100</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>↗️ Orientation</span>
+                                    <strong>{{ summary.overall_orientation|floatformat:1 }}/100</strong>
+                                </li>
+                            </ul>
+                            <div class="mt-3">
+                                <p class="mb-0"><strong>Letters Graded:</strong> {{ document.get_letter_count }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if summary.comments %}
+                    <div class="alert alert-info">
+                        <h6>💬 Comments:</h6>
+                        <p class="mb-0">{{ summary.comments }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if summary.strengths %}
+                    <div class="alert alert-success">
+                        <h6>💪 Strengths:</h6>
+                        <p class="mb-0">{{ summary.strengths }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if summary.areas_for_improvement %}
+                    <div class="alert alert-warning">
+                        <h6>📈 Areas for Improvement:</h6>
+                        <p class="mb-0">{{ summary.areas_for_improvement }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Per-Letter Summaries (5 repetitions each) -->
+                    <div class="mt-4">
+                        <h6>Letter Averages (Across 5 Repetitions Each):</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Letter</th>
+                                        <th>Avg Form</th>
+                                        <th>Avg Size</th>
+                                        <th>Avg Align</th>
+                                        <th>Avg Orient</th>
+                                        <th>Overall Avg</th>
+                                        <th>Grade</th>
+                                        <th>Best</th>
+                                        <th>Worst</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for letter_summary in document.letter_summaries.all %}
+                                    <tr>
+                                        <td><strong>{{ letter_summary.letter }}</strong></td>
+                                        <td>{{ letter_summary.avg_letter_form|floatformat:1 }}</td>
+                                        <td>{{ letter_summary.avg_size|floatformat:1 }}</td>
+                                        <td>{{ letter_summary.avg_line_align|floatformat:1 }}</td>
+                                        <td>{{ letter_summary.avg_orientation|floatformat:1 }}</td>
+                                        <td><strong>{{ letter_summary.letter_average|floatformat:1 }}</strong></td>
+                                        <td><span class="badge bg-primary">{{ letter_summary.get_letter_grade }}</span></td>
+                                        <td class="text-success">{{ letter_summary.best_score|floatformat:1 }}</td>
+                                        <td class="text-danger">{{ letter_summary.worst_score|floatformat:1 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Individual Letter Instances (All 130 repetitions) -->
+                    <div class="mt-4">
+                        <details>
+                            <summary><h6 style="display: inline; cursor: pointer;">📋 View All Individual Repetitions ({{ document.get_total_repetitions }} instances)</h6></summary>
+                            <div class="table-responsive mt-3">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Pos</th>
+                                            <th>Letter</th>
+                                            <th>Rep</th>
+                                            <th>Form</th>
+                                            <th>Size</th>
+                                            <th>Align</th>
+                                            <th>Orient</th>
+                                            <th>Avg</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for instance in document.letter_grades.all %}
+                                        <tr>
+                                            <td>{{ instance.position_in_worksheet }}</td>
+                                            <td><strong>{{ instance.letter }}</strong></td>
+                                            <td>{{ instance.repetition_number }}</td>
+                                            <td>{{ instance.letter_form|floatformat:0 }}</td>
+                                            <td>{{ instance.size|floatformat:0 }}</td>
+                                            <td>{{ instance.line_align|floatformat:0 }}</td>
+                                            <td>{{ instance.orientation|floatformat:0 }}</td>
+                                            <td><strong>{{ instance.get_instance_score|floatformat:0 }}</strong></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- <div class="text-muted small mt-3"> -->
+                    <!--     <p class="mb-0"> -->
+                    <!--         Graded by: {{ summary.graded_by|default:"System" }} |  -->
+                    <!--         Method: {{ summary.get_grading_method_display }} |  -->
+                    <!--         Date: {{ summary.graded_at|date:"F d, Y H:i" }} -->
+                    <!--     </p> -->
+                    <!-- </div> -->
+                    {% endwith %}
+                {% else %}
+                    <p class="text-muted">Grading data incomplete. Please re-grade the worksheet.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="text-center mt-4">
             <a href="{{ document.get_display_image.url }}" download class="btn btn-success">
                 ⬇ Download Worksheet
             </a>
-            <a href="#" class="btn btn-info" id="startGradingBtn">
-                🎯 Start Grading (Coming Soon)
+            {% if document.is_graded %}
+                <a href="{% url 'grade_worksheet' pk=document.pk %}" class="btn btn-warning">
+                    ✏️ Edit Grade
+                </a>
+            {% endif %}
+            <a href="/document/{{ document.pk }}/grade/" class="btn btn-primary">
+                🎯 Start Grading
             </a>
         </div>
     </div>
@@ -183,15 +343,6 @@
                 confirmDeleteBtn.innerHTML = 'Delete';
             }
         });
-
-        // Handle "Start Grading" button click
-        const startGradingBtn = document.getElementById('startGradingBtn');
-        if (startGradingBtn) {
-            startGradingBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                alert('Grading feature coming soon! This will allow automatic grading of student worksheets.');
-            });
-        }
     </script>
 </body>
 </html>

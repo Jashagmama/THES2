@@ -1,8 +1,6 @@
-from django.core import validators
 from django.db import models
-from django.forms import FloatField
 from django.utils import timezone
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from PIL import Image, ImageDraw
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -24,7 +22,10 @@ class ScannedDocument(models.Model):
     # Store crop coordinates as JSON
     crop_coordinates = models.JSONField(null=True, blank=True)
     is_cropped = models.BooleanField(default=False)
+    
+    # Grading status
     is_graded = models.BooleanField(default=False)
+    graded_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-uploaded_at']
@@ -38,41 +39,25 @@ class ScannedDocument(models.Model):
             return False
         
         try:
-            # Open original image
             img = Image.open(self.original_image)
-            
-            # Ensure coordinates are in correct order
             left = min(x1, x2)
             top = min(y1, y2)
             right = max(x1, x2)
             bottom = max(y1, y2)
-            
-            # Crop the image
             cropped = img.crop((left, top, right, bottom))
-            
-            # Save cropped image
             output = BytesIO()
             cropped.save(output, format='JPEG', quality=95)
             output.seek(0)
-            
-            # Store crop coordinates
-            self.crop_coordinates = {
-                'x1': left, 'y1': top,
-                'x2': right, 'y2': bottom
-            }
-            
-            # Create file
+            self.crop_coordinates = {'x1': left, 'y1': top, 'x2': right, 'y2': bottom}
             self.cropped_image = InMemoryUploadedFile(
                 output, 'ImageField',
                 f"cropped_{self.original_image.name.split('/')[-1]}",
                 'image/jpeg',
                 sys.getsizeof(output), None
             )
-            
             self.is_cropped = True
             self.save()
             return True
-            
         except Exception as e:
             print(f"Crop error: {e}")
             return False
@@ -81,68 +66,215 @@ class ScannedDocument(models.Model):
         """Return the best image to display"""
         return self.cropped_image if self.is_cropped and self.cropped_image else self.original_image
     
+    def get_overall_grade(self):
+        """Calculate overall grade from letter averages"""
+        letter_summaries = self.letter_summaries.all()
+        if letter_summaries.exists():
+            avg_letter_form = sum(l.avg_letter_form for l in letter_summaries) / len(letter_summaries)
+            avg_size = sum(l.avg_size for l in letter_summaries) / len(letter_summaries)
+            avg_line_align = sum(l.avg_line_align for l in letter_summaries) / len(letter_summaries)
+            avg_orientation = sum(l.avg_orientation for l in letter_summaries) / len(letter_summaries)
+            overall = (avg_letter_form + avg_size + avg_line_align + avg_orientation) / 4
+            return round(overall, 2)
+        return None
+    
+    def get_letter_count(self):
+        """Get number of unique letters"""
+        return self.letter_summaries.count()
+    
+    def get_total_repetitions(self):
+        """Get total number of letter repetitions graded"""
+        return self.letter_grades.count()
+    
     def save(self, *args, **kwargs):
         if self.original_image and not self.file_size:
             self.file_size = self.original_image.size
         super().save(*args, **kwargs)
 
 
-class HandwritingGrade(models.Model):
-    document = models.OneToOneField(
-        ScannedDocument,
+class LetterGrade(models.Model):
+    """Store grades for individual letter instances (e.g., 5 repetitions of 'A')"""
+    
+    document = models.ForeignKey(
+        ScannedDocument, 
         on_delete=models.CASCADE,
-        related_name='hw_grade',
+        related_name='letter_grades'
     )
-
+    
+    # Letter information
+    letter = models.CharField(max_length=1, help_text="The letter (A-Z)")
+    repetition_number = models.IntegerField(help_text="Which repetition (1-5)")
+    # position_in_worksheet = models.IntegerField(help_text="Overall position in worksheet")
+    
+    # Grading criteria for this specific instance
     letter_form = models.FloatField(
-        validators=[validators.MinValueValidator(0), validators.MaxValueValidator(100)],
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Quality of letter formation"
     )
-
     size = models.FloatField(
-        validators=[validators.MinValueValidator(0), validators.MaxValueValidator(100)],
-        help_text="Letter size in relation to template character size"
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Appropriateness of size"
     )
-
     line_align = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Alignment with baseline and proper spacing"
+        help_text="Baseline alignment"
     )
     orientation = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Proper slant and angle of letters"
+        help_text="Letter slant/angle"
     )
-
-    # Overall grade (auto-calculated or manual)
-    overall_score = models.FloatField(
-        null=True, blank=True,
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Overall handwriting score"
-    )
-
+    
+    # Bounding box for this letter instance
+    bbox_x = models.IntegerField(null=True, blank=True)
+    bbox_y = models.IntegerField(null=True, blank=True)
+    bbox_width = models.IntegerField(null=True, blank=True)
+    bbox_height = models.IntegerField(null=True, blank=True)
+    
+    # Score for this instance
+    instance_score = models.FloatField(null=True, blank=True)
+    
+    # Comments for this specific instance
+    comments = models.TextField(blank=True)
+    
     graded_at = models.DateTimeField(auto_now_add=True)
-
-    comments = models.TextField(blank=True, help_text="Detailed feedback for the student")
-    strengths = models.TextField(blank=True, help_text="What the student does well")
-    areas_for_improvement = models.TextField(blank=True, help_text="Areas that need work")
-
+    
+    class Meta:
+        # ordering = ['position_in_worksheet']
+        unique_together = ['document', 'letter', 'repetition_number']
+    
     def __str__(self):
-        return f"Grade for {self.document.title or f'Worksheet {self.document.id}'}"
-
-    def get_overall_score(self):
-        """Calculate overall score from individual criteria"""
-        if self.overall_score is not None:
-            return self.overall_score
-
-        # Calculate weighted average
-        criteria = [self.letter_form, self.size, self.line_align, self.orientation]
-        weights = [0.3, 0.25, 0.25, 0.2]  # Adjust weights as needed
-
-        # Normalize weights to sum to 1
-        total_weight = sum(weights[:len(criteria)])
-        normalized_weights = [w / total_weight for w in weights[:len(criteria)]]
-
-        # Calculate weighted score
-        score = sum(c * w for c, w in zip(criteria, normalized_weights))
+        return f"{self.letter} (rep {self.repetition_number}) - {self.document.title or f'Doc {self.document.id}'}"
+    
+    def get_instance_score(self):
+        """Calculate score for this instance"""
+        if self.instance_score is not None:
+            return self.instance_score
+        score = (self.letter_form + self.size + self.line_align + self.orientation) / 4
         return round(score, 2)
+    
+    def save(self, *args, **kwargs):
+        if not self.document.is_graded:
+            self.document.is_graded = True
+            self.document.graded_at = timezone.now()
+            self.document.save()
+        super().save(*args, **kwargs)
 
+
+class LetterSummary(models.Model):
+    """Aggregated scores for each letter across all repetitions"""
+    
+    document = models.ForeignKey(
+        ScannedDocument,
+        on_delete=models.CASCADE,
+        related_name='letter_summaries'
+    )
+    
+    letter = models.CharField(max_length=1, help_text="The letter (A-Z)")
+    
+    # Average scores across all repetitions
+    avg_letter_form = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    avg_size = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    avg_line_align = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    avg_orientation = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    
+    # Overall average for this letter
+    letter_average = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    
+    # Number of repetitions graded
+    repetition_count = models.IntegerField(default=5)
+    
+    # Best and worst scores
+    best_score = models.FloatField(null=True, blank=True)
+    worst_score = models.FloatField(null=True, blank=True)
+    
+    # Feedback for this letter
+    comments = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['letter']
+        unique_together = ['document', 'letter']
+    
+    def __str__(self):
+        return f"Summary for '{self.letter}' - {self.document.title or f'Doc {self.document.id}'}"
+    
+    def get_letter_grade(self):
+        """Convert to letter grade"""
+        score = self.letter_average
+        if score >= 90: return 'A'
+        elif score >= 80: return 'B'
+        elif score >= 70: return 'C'
+        elif score >= 60: return 'D'
+        else: return 'F'
+
+
+class WorksheetSummary(models.Model):
+    """Overall summary for the entire worksheet"""
+    
+    document = models.OneToOneField(
+        ScannedDocument,
+        on_delete=models.CASCADE,
+        related_name='worksheet_summary'
+    )
+    
+    # Overall scores (aggregated from letter averages)
+    overall_letter_form = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    overall_size = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    overall_line_align = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    overall_orientation = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    
+    overall_score = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    
+    # Statistics
+    total_letters = models.IntegerField(help_text="Number of unique letters")
+    total_repetitions = models.IntegerField(help_text="Total instances graded")
+    
+    # Grading metadata
+    grading_method = models.CharField(
+        max_length=20,
+        choices=[
+            ('manual', 'Manual Grading'),
+            ('automatic', 'Automatic AI Grading'),
+            ('hybrid', 'Hybrid (AI + Manual Review)')
+        ],
+        default='automatic'
+    )
+    graded_by = models.CharField(max_length=255, blank=True)
+    
+    # Overall feedback
+    comments = models.TextField(blank=True)
+    strengths = models.TextField(blank=True)
+    areas_for_improvement = models.TextField(blank=True)
+    
+    graded_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Summary for {self.document.title or f'Doc {self.document.id}'}"
+    
+    def get_letter_grade(self):
+        """Convert to letter grade"""
+        score = self.overall_score
+        if score >= 90: return 'A'
+        elif score >= 80: return 'B'
+        elif score >= 70: return 'C'
+        elif score >= 60: return 'D'
+        else: return 'F'

@@ -1,0 +1,145 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade Worksheet - {{ document.title|default:"Untitled" }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .grade-container {
+            max-width: 1200px;
+            margin: 50px auto;
+        }
+        .worksheet-preview {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .grade-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container grade-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>📝 Grade Worksheet</h1>
+            <div>
+                <a href="{% url 'document_detail' document.pk %}" class="btn btn-secondary">
+                    ← Back to Worksheet
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-6">
+                <h5 class="mb-3">{{ document.title|default:"Untitled Worksheet" }}</h5>
+                <img src="{{ document.get_display_image.url }}" alt="Worksheet" class="worksheet-preview">
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="grade-card">
+                    <h3 class="mb-4">🤖 Automatic Grading</h3>
+                    <p class="text-muted mb-4">
+                        Click the button below to automatically grade all letters in this worksheet.<br>
+                        The system will analyze <strong>26 letters × 5 repetitions = 130 instances</strong>.
+                    </p>
+                    
+                    <button class="btn btn-primary btn-lg" id="autoGradeBtn">
+                        ⚡ Auto-Grade Worksheet
+                    </button>
+                    
+                    <div id="statusMessage" class="mt-4"></div>
+                    
+                    <div id="progressBar" class="mt-4" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 100%"></div>
+                        </div>
+                        <p class="mt-2 text-muted">Analyzing handwriting...</p>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <h6>ℹ️ How it works:</h6>
+                    <ul class="mb-0 text-start">
+                        <li>Detects all 130 letter instances</li>
+                        <li>Grades each on: formation, size, alignment, orientation</li>
+                        <li>Generates overall worksheet score and feedback</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const autoGradeBtn = document.getElementById('autoGradeBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const progressBar = document.getElementById('progressBar');
+
+        autoGradeBtn.addEventListener('click', async function() {
+            autoGradeBtn.disabled = true;
+            autoGradeBtn.innerHTML = '⏳ Processing...';
+            progressBar.style.display = 'block';
+            statusMessage.innerHTML = '';
+
+            try {
+                const response = await fetch("{% url 'auto_grade_worksheet' document.pk %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                progressBar.style.display = 'none';
+
+                if (data.success) {
+                    statusMessage.innerHTML = `
+                        <div class="alert alert-success">
+                            <h5>✓ Grading Complete!</h5>
+                            <p class="mb-2">
+                                <strong>Overall Score:</strong> ${data.grade.overall_score}/100<br>
+                                <strong>Letters:</strong> ${data.grade.letter_count}<br>
+                                <strong>Total Instances:</strong> ${data.grade.total_repetitions}
+                            </p>
+                            <p class="mb-0">${data.message}</p>
+                        </div>
+                    `;
+                    
+                    // Redirect to results after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = "{% url 'document_detail' document.pk %}";
+                    }, 2000);
+                } else {
+                    statusMessage.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>✗ Error:</strong> ${data.message}
+                        </div>
+                    `;
+                    autoGradeBtn.disabled = false;
+                    autoGradeBtn.innerHTML = '⚡ Auto-Grade Worksheet';
+                }
+            } catch (error) {
+                progressBar.style.display = 'none';
+                statusMessage.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>✗ Error:</strong> ${error.message}
+                    </div>
+                `;
+                autoGradeBtn.disabled = false;
+                autoGradeBtn.innerHTML = '⚡ Auto-Grade Worksheet';
+            }
+        });
+    </script>
+</body>
+</html>

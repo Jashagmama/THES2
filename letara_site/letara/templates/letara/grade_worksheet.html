@@ -1,0 +1,319 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade Worksheet - {{ document.title|default:"Untitled" }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .grading-container {
+            max-width: 1400px;
+            margin: 30px auto;
+        }
+        .worksheet-preview {
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow: hidden;
+        }
+        .worksheet-image {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .grading-form {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .criteria-input {
+            margin-bottom: 20px;
+        }
+        .range-value {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #0d6efd;
+        }
+        .grade-indicator {
+            height: 10px;
+            background: linear-gradient(to right, #dc3545, #ffc107, #198754);
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .auto-grade-section {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container grading-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>📝 Grade Worksheet</h1>
+            <div>
+                <a href="{% url 'document_detail' document.pk %}" class="btn btn-secondary">
+                    ← Back to Worksheet
+                </a>
+                <a href="{% url 'document_list' %}" class="btn btn-outline-secondary">
+                    All Worksheets
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left side: Worksheet Image -->
+            <div class="col-lg-5">
+                <div class="worksheet-preview">
+                    <h5 class="mb-3">{{ document.title|default:"Untitled Worksheet" }}</h5>
+                    <img src="{{ document.get_display_image.url }}" alt="Worksheet" class="worksheet-image" id="worksheetImage">
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-primary" onclick="zoomIn()">🔍 Zoom In</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="zoomOut()">🔍 Zoom Out</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="resetZoom()">↺ Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right side: Grading Form -->
+            <div class="col-lg-7">
+                <!-- Auto-grade option -->
+                <div class="auto-grade-section">
+                    <h5>Automatic Grading</h5>
+                    <p class="mb-2">Automatically analyze the worksheet.</p>
+                    <button class="btn btn-primary" id="autoGradeBtn">
+                        Auto-Grade Worksheet
+                    </button>
+                    <span id="autoGradeStatus" class="ms-3"></span>
+                </div>
+
+                <!-- Manual grading form -->
+                <div class="grading-form">
+                    <h5 class="mb-4">Manual Grading</h5>
+                    
+                    {% if existing_grade %}
+                    <div class="alert alert-info">
+                        ℹ️ This worksheet was previously graded. You can update the scores below.
+                    </div>
+                    {% endif %}
+
+                    <form method="post" id="gradingForm">
+                        {% csrf_token %}
+
+                        <!-- Grading Criteria -->
+                        <div class="mb-4">
+                            <h6>Grading Criteria (0-100)</h6>
+                            
+                            <!-- Letter Formation -->
+                            <div class="criteria-input">
+                                <label class="form-label">✍️ Letter Formation</label>
+                                <div class="grade-indicator"></div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="range" class="form-range flex-grow-1" 
+                                           name="letter_form" id="id_letter_form" 
+                                           min="0" max="100" step="0.1" value="{{ form.letter_form.value|default:75 }}"
+                                           oninput="updateRangeValue(this, 'letter_form_value')">
+                                    <span class="range-value" id="letter_form_value">{{ form.letter_form.value|default:75 }}</span>
+                                </div>
+                                <small class="text-muted">Quality of letter formation and shape</small>
+                            </div>
+
+                            <!-- Size -->
+                            <div class="criteria-input">
+                                <label class="form-label">📏 Size Consistency</label>
+                                <div class="grade-indicator"></div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="range" class="form-range flex-grow-1" 
+                                           name="size" id="id_size" 
+                                           min="0" max="100" step="0.1" value="{{ form.size.value|default:75 }}"
+                                           oninput="updateRangeValue(this, 'size_value')">
+                                    <span class="range-value" id="size_value">{{ form.size.value|default:75 }}</span>
+                                </div>
+                                <small class="text-muted">Consistency and appropriateness of letter size</small>
+                            </div>
+
+                            <!-- Line Alignment -->
+                            <div class="criteria-input">
+                                <label class="form-label">📐 Line Alignment</label>
+                                <div class="grade-indicator"></div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="range" class="form-range flex-grow-1" 
+                                           name="line_align" id="id_line_align" 
+                                           min="0" max="100" step="0.1" value="{{ form.line_align.value|default:75 }}"
+                                           oninput="updateRangeValue(this, 'line_align_value')">
+                                    <span class="range-value" id="line_align_value">{{ form.line_align.value|default:75 }}</span>
+                                </div>
+                                <small class="text-muted">Alignment with baseline and proper spacing</small>
+                            </div>
+
+                            <!-- Orientation -->
+                            <div class="criteria-input">
+                                <label class="form-label">↗️ Orientation</label>
+                                <div class="grade-indicator"></div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="range" class="form-range flex-grow-1" 
+                                           name="orientation" id="id_orientation" 
+                                           min="0" max="100" step="0.1" value="{{ form.orientation.value|default:75 }}"
+                                           oninput="updateRangeValue(this, 'orientation_value')">
+                                    <span class="range-value" id="orientation_value">{{ form.orientation.value|default:75 }}</span>
+                                </div>
+                                <small class="text-muted">Proper slant and angle of letters</small>
+                            </div>
+
+                            <!-- Optional: Spacing -->
+                            <!-- <div class="criteria-input"> -->
+                            <!--     <label class="form-label">↔️ Spacing (Optional)</label> -->
+                            <!--     <div class="grade-indicator"></div> -->
+                            <!--     <div class="d-flex align-items-center gap-3"> -->
+                            <!--         <input type="range" class="form-range flex-grow-1"  -->
+                            <!--                name="spacing" id="id_spacing"  -->
+                            <!--                min="0" max="100" step="0.1" value="{{ form.spacing.value|default:75 }}" -->
+                            <!--                oninput="updateRangeValue(this, 'spacing_value')"> -->
+                            <!--         <span class="range-value" id="spacing_value">{{ form.spacing.value|default:75 }}</span> -->
+                            <!--     </div> -->
+                            <!--     <small class="text-muted">Word and letter spacing consistency</small> -->
+                            <!-- </div> -->
+
+                            <!-- Optional: Neatness -->
+                            <!-- <div class="criteria-input"> -->
+                            <!--     <label class="form-label">✨ Neatness (Optional)</label> -->
+                            <!--     <div class="grade-indicator"></div> -->
+                            <!--     <div class="d-flex align-items-center gap-3"> -->
+                            <!--         <input type="range" class="form-range flex-grow-1"  -->
+                            <!--                name="neatness" id="id_neatness"  -->
+                            <!--                min="0" max="100" step="0.1" value="{{ form.neatness.value|default:75 }}" -->
+                            <!--                oninput="updateRangeValue(this, 'neatness_value')"> -->
+                            <!--         <span class="range-value" id="neatness_value">{{ form.neatness.value|default:75 }}</span> -->
+                            <!--     </div> -->
+                            <!--     <small class="text-muted">Overall neatness and clarity</small> -->
+                            <!-- </div> -->
+                        </div>
+
+                        <!-- Overall Score (Optional) -->
+                        <div class="mb-4">
+                            <label class="form-label">📊 Overall Score (Optional - Auto-calculated if blank)</label>
+                            {{ form.overall_score }}
+                        </div>
+
+                        <!-- Grading Method -->
+                        <!-- <div class="mb-3"> -->
+                        <!--     <label class="form-label">Grading Method</label> -->
+                        <!--     {{ form.grading_method }} -->
+                        <!-- </div> -->
+
+                        <!-- Graded By -->
+                        <!-- <div class="mb-3"> -->
+                            <!-- <label class="form-label">Graded By</label> -->
+                            <!-- {{ form.graded_by }} -->
+                        <!-- </div> -->
+
+                        <!-- Feedback Section -->
+                        <div class="mb-4">
+                            <h6>📝 Feedback</h6>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">General Comments</label>
+                                {{ form.comments }}
+                            </div>
+
+                            <!-- replace this with automated response basing it on variance or such -->
+                            <div class="mb-3">
+                                <label class="form-label">💪 Strengths</label>
+                                {{ form.strengths }}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">📈 Areas for Improvement</label>
+                                {{ form.areas_for_improvement }}
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'document_detail' document.pk %}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                💾 Save Grade
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update range value display
+        function updateRangeValue(input, displayId) {
+            document.getElementById(displayId).textContent = parseFloat(input.value).toFixed(1);
+        }
+
+        // Zoom functionality
+        let zoomLevel = 1;
+        const img = document.getElementById('worksheetImage');
+
+        function zoomIn() {
+            zoomLevel = Math.min(zoomLevel + 0.2, 3);
+            img.style.transform = `scale(${zoomLevel})`;
+            img.style.transformOrigin = 'top left';
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(zoomLevel - 0.2, 0.5);
+            img.style.transform = `scale(${zoomLevel})`;
+            img.style.transformOrigin = 'top left';
+        }
+
+        function resetZoom() {
+            zoomLevel = 1;
+            img.style.transform = 'scale(1)';
+        }
+
+        // Auto-grade functionality
+        document.getElementById('autoGradeBtn').addEventListener('click', async function() {
+            const btn = this;
+            const status = document.getElementById('autoGradeStatus');
+            
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Analyzing...';
+            status.innerHTML = '<span class="text-info">Processing handwriting...</span>';
+
+            try {
+                const response = await fetch("{% url 'auto_grade_worksheet' document.pk %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.innerHTML = `<span class="text-success">✓ Auto-graded! Score: ${data.grade.overall_score} (${data.grade.letter_grade})</span>`;
+                    
+                    // Reload page to show auto-generated scores
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    status.innerHTML = `<span class="text-danger">✗ Error: ${data.message}</span>`;
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Auto-Grade Worksheet';
+                }
+            } catch (error) {
+                status.innerHTML = `<span class="text-danger">✗ Error: ${error.message}</span>`;
+                btn.disabled = false;
+                btn.innerHTML = '⚡ Auto-Grade Worksheet';
+            }
+        });
+    </script>
+</body>
+</html>

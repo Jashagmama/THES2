@@ -53,8 +53,8 @@ def plot_imgs(imgs: list, n_row, n_col, file_name=''):
     plt.tight_layout()
     if file_name.strip() != '': 
         plt.savefig(f'{file_name}.png', bbox_inches='tight')
-    plt.show()
-    plt.close('all')
+    # plt.show()
+    # plt.close('all')
 
 
 def show_img(img: MatLike, title: str = '') -> None:
@@ -90,7 +90,6 @@ def template_char_check(img: MatLike):
 
     print('template_char_check called')
 
-    show_img(img)
     if len(img.shape) == 3:
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     
@@ -114,7 +113,6 @@ def template_char_check(img: MatLike):
     
     return img, word_dict[np.argmax(prediction)]
     # modify this such that if there is already an implementation 
-    # show_img(img, 'normalized')
 
 '''
 Red lines removal related functions
@@ -182,7 +180,6 @@ def check_page(img: MatLike):
     # ROW_SIZE = 6
     # COL2_RANGE = 11
     coords = Boxman(mode='check').cells
-    # show_img(img, 'check page img')
     #add list of character ranges for each page to return the correct file path or whatever representation
     char_set = ["ABCDEFGHIJ",
                 "KLMNOPQRST",
@@ -244,7 +241,6 @@ def preproc_char_iso(img: MatLike, type=''):
         img = cv.dilate(img, kernel, iterations=1)
     
     img = cv.bitwise_not(img)
-    # show_img(img, 'preproc_char_iso')
     
     return img
 
@@ -280,7 +276,6 @@ def count_grid_cells(img) -> int:
         15, 
         10
     )
-    # show_img(binary)
     # Find contours
     contours, _ = cv.findContours(binary, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     
@@ -318,10 +313,8 @@ def eval_orientation(img):
     # imgs = []
     # imgs.append(img)
     angle = get_angle(img)
-    # show_img(img, 'eval orientation')
     deskewed_img = rotate(img, angle, border_value=(255, 255, 255))
     # border_value=(255, 255, 255)
-    # show_img(deskewed_img, 'deskewed orientation')
     # imgs.append(deskewed_img)
     # plot_imgs(imgs,1,2)
     print(f"angle: {angle}")
@@ -394,7 +387,6 @@ def eval_size_align(img):
     # cv.rectangle(img, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 1)
     print("x,y,w,h:",true_x,true_y,true_w,true_h)
     print(f"returns {true_h}, {bottom}")
-    # show_img(img, 'size')
     # returns size, align
     '''
     size  -> refers to the written character's height
@@ -403,20 +395,22 @@ def eval_size_align(img):
     return true_h, bottom
 
 def percentage_diff(n1, n2):
-    if n1 == 0 or n2  == 0: # a temporary fix need to fix bounding box generation for letters to remove this
+    if n1 == 0 or n2  == 0 or (n1 + n2 == 0): # a temporary fix need to fix bounding box generation for letters to remove this
         return 0
     return abs(n1-n2)/(abs(n1+n2)/2) * 100
 
-def eval_char_final(letter, template_letter, grade='K'):
+def eval_char_final(letter, template_letter, grade='k'):
+    MAX_SKEW = 45 # max acceptable skew of a character
+    TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
     match grade.strip().lower():
         case 'k':
-            print('Kinder rubric selected')
+            # print('Kinder rubric selected')
             letter_form_percent = 60
             line_align_percent = 40
             orientation_percent = 60
             size_percent = 50
         case '1':
-            print('Grade 1 rubric selected')     
+            # print('Grade 1 rubric selected')
             letter_form_percent = 40
             line_align_percent = 20
             orientation_percent = 40
@@ -425,15 +419,28 @@ def eval_char_final(letter, template_letter, grade='K'):
             letter_form_percent = 20
             line_align_percent = 10
             orientation_percent = 20
-            size_percent = 5
-            print('Grade 2 rubric selected')
+            size_percent = 10   # changed from 5 to 10 despite rubric 
+                                # due to parts of template may be removed when removing grid
             
-                    
-    letter.letter_form_status = (percentage_diff(letter.letter_form, template_letter.letter_form) <= letter_form_percent)  
-    letter.orientation_status = (percentage_diff(letter.orientation, template_letter.orientation) <= orientation_percent)
-    letter.orientation_status = True
-    letter.size_status = (percentage_diff(letter.size, template_letter.size) <= size_percent)
-    letter.line_align_status = (percentage_diff(letter.line_align_status, template_letter.line_align_status) <= line_align_percent)
+    # Calculate individual statuses
+    letter.letter_form_status = (100 - letter.letter_form * 100 <= letter_form_percent)
+    # or (percentage_diff(letter.letter_form, template_letter.letter_form) <= letter_form_percent)
+    # letter.orientation_status = abs(letter.orientation) <= abs(template_letter.orientation) or (percentage_diff(letter.orientation, template_letter.orientation) <= orientation_percent)
+    # letter.orientation_status = True
+    letter.orientation_status = (100 * (abs(letter.orientation) / MAX_SKEW)) <= orientation_percent
+    letter.size_status = (percentage_diff(letter.size, TRUE_HEIGHT) <= size_percent) or (percentage_diff(letter.size, template_letter.size) <= size_percent)
+    letter.line_align_status = abs(letter.line_align) <= abs(template_letter.line_align) or (percentage_diff(letter.line_align, template_letter.line_align) <= line_align_percent)
+    
+    # Combine into single grade with equal weighting
+    statuses = [
+        letter.letter_form_status,
+        letter.orientation_status,
+        letter.size_status,
+        letter.line_align_status
+    ]
+    
+    letter.overall_status = sum(statuses) / len(statuses) >= 0.5  # Returns True if 50%+ pass
+    letter.overall_status = letter.size > 0 and letter.overall_status
 
 # resize character
 def resize_cr(img: MatLike):
@@ -459,6 +466,8 @@ def get_rects(bin):
     
 def count_rect(img: MatLike) -> int:
     assert img is not None, "image not found"
+
+    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     
     # Preprocess
     blurred = cv.GaussianBlur(img, (5, 5), 0)
@@ -477,9 +486,7 @@ def count_rect(img: MatLike) -> int:
     # Visualize
     # output = cv.cvtColor(image, cv.COLOR_GRAY2BGR)
     
-    # show_img(binary, "binary")
     # output = cv.drawContours( image, squares, -1, (0, 255, 0), 3 )
-    # show_img(output, "detected grids")
 
     return len(squares)
 
@@ -544,7 +551,6 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     h, w, _ = template_color.shape
     aligned_image = cv.warpPerspective(filled_doc_color, homography, (w, h))
     cv.imwrite(output_path, aligned_image)
-    show_img(aligned_image, 'aligned')
     print(f"✅ SIFT alignment done -> {output_path}")
     return aligned_image
 
@@ -553,7 +559,7 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 # Step 3: Perspective Correction
 # ---------------------------- #
 # have to check the current image first for the existing letters or character set 
-def correct_perspective(image: MatLike, num_enclosed: int, output_path: str="3_corrTab.png") -> MatLike:
+def correct_perspective(image: MatLike, output_path: str="3_corrTab.png") -> MatLike:
     
     # char_set = {"ABCDEFGHIJ": "./template/A-J.png",
     #             "KLMNOPQRST": "./template/K-T.png",
@@ -589,23 +595,24 @@ def correct_perspective(image: MatLike, num_enclosed: int, output_path: str="3_c
             avg_height = (left_height + right_height) / 2
 
             # 100px height per character
-            if num_enclosed <= 12: # if number of cells is less than 60 supposedly it is assumed it is yz worksheet
-            # have to fix this tho
-            # Scale to desired height
-                scale = 200 / avg_height
-                width = int(top_width * scale)
-                height = 200
-            else:
-                height, width = thresh.shape
-                width_ratio = width / height
-                height = 1000
-                width = ceil(width_ratio * 1000)
+            # if num_enclosed <= 12: # if number of cells is less than 60 supposedly it is assumed it is yz worksheet
+            # # have to fix this tho
+            # # Scale to desired height
+            #     scale = 200 / avg_height
+            #     width = int(top_width * scale)
+            #     height = 200
+            # else:
+            height, width = thresh.shape
+            width_ratio = width / height
+            height = 1000
+            width = ceil(width_ratio * 1000)
 
             dst_points = np.float32([[0, 0], [width-1, 0],
                                      [width-1, height-1], [0, height-1]])
             M = cv.getPerspectiveTransform(rect, dst_points)
             corrected = cv.warpPerspective(image, M, (width, height))
 
+            
                 
             # Bottom points stay at same y-level, expanded horizontally
             dst_points = np.float32([[0, 0], [width-1, 0],
@@ -694,7 +701,7 @@ def isolate_chars(img: MatLike, boxes):
     #     chr_isolated = preproc_char
     #     imgs.append(chr_isolated)
 
-    plot_imgs(imgs, num_row, num_col)
+    # plot_imgs(imgs, num_row, num_col)
 
 
 # ---------------------------- #
@@ -725,7 +732,6 @@ def remove_grid(img: MatLike) -> MatLike:
     for c in cnts:
         cv.drawContours(result, [c], -1, (255,255,255), 5)
 
-    # show_img(result, 'res')
     # cv.imwrite('./res_imgs/lines_removed.png', result)
     return result
 
@@ -763,7 +769,6 @@ def eval_letters(img: MatLike, box, char_set):
             conf_lvl, _ = eval_letter_form(char_pred, exp_char)
             new_letter.letter_form = conf_lvl 
             new_letter.orientation = orientation_angle
-            # show_img(chr_isolated)
             char_conf_lvl = char_conf_lvl + conf_lvl
             eval_preproc.append(chr_isolated)
             if j != 0:
@@ -824,7 +829,6 @@ if __name__ == "__main__":
         print("\n--- Shadow Removal ---")
 
         shadow_removed = remove_shadow(sift_aligned)
-        show_img(shadow_removed, "shadow removed")
         cv.imwrite("removed_shadow.png", shadow_removed)
 
         # remove this update the code to parse the new template 
@@ -836,7 +840,6 @@ if __name__ == "__main__":
         grid_removed = remove_grid(perspective_corrected)
 
         print("\n--- Remove Red Lines ---")
-# show_img(sharpen, 'sharpened')
         result, mask = detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
         image_processed, white_telea = white_mask_then_inpaint(grid_removed, mask, dilate_iterations=1, inpaint_radius=1, method='telea')
 
@@ -847,7 +850,6 @@ if __name__ == "__main__":
         eval_letters(image_processed, boxes, char_set) 
 
         res_img = create_result(perspective_corrected, boxes.letters)
-        show_img(res_img, 'result')
     except Exception as e:
         print(f"❌ Pipeline failed: {e}")
 # isolate_chars(image_processed, boxes.cells)
@@ -861,10 +863,6 @@ if __name__ == "__main__":
 # cycle_characters(cleaned_telea, boxes)
 
 
-# show_img(result1, 'Very Permissive - Detected Red')
-# show_img(mask1, 'Mask 1')
-# show_img(inpainted1_telea, 'White + Inpainted - Telea Method')
-# show_img(inpainted1_ns, 'White + Inpainted - NS Method')
 
 # print("\n--- Enhance Handwriting Final ---")
 # count_enclosed(red_removed2)
