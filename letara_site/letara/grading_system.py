@@ -97,10 +97,9 @@ def grade_handwriting_by_letter(image_path):
     shadow_removed = remove_shadow(sift_aligned)
     cv.imwrite("removed_shadow.png", shadow_removed)
 
-    num_enclosed = count_rect(shadow_removed)
+    num_enclosed = count_rect(shadow_removed) # don't need this anymore
 
     print("\n--- Perspective Correction ---")
-# perspective_corrected = fullPipe.correct_perspective(sift_aligned, "3_corrTab.png")
     perspective_corrected = correct_perspective(shadow_removed, "3_corrTab.png")
 
 
@@ -108,7 +107,7 @@ def grade_handwriting_by_letter(image_path):
     grid_removed = remove_grid(perspective_corrected)
     print("\n--- Remove Red Lines ---")
     result2, mask2 = detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
-    inpainted2_telea, white2_telea = white_mask_then_inpaint(grid_removed, mask2, dilate_iterations=2, inpaint_radius=3, method='telea')
+    inpainted2_telea, _ = white_mask_then_inpaint(grid_removed, mask2, dilate_iterations=2, inpaint_radius=3, method='telea')
     image_processed = inpainted2_telea
     cv.imwrite("./red_removed.png", image_processed)
 # image_processed = fullPipe.remove_colored_lines(grid_removed, "4_no_red.png")
@@ -290,6 +289,13 @@ def calculate_letter_summaries(letter_instances):
         if not instances:
             continue
         
+        for i in instances:
+            print(f'letter_form: {i['letter_form']}')
+            print(f'size: {i['size']}')
+            print(f'line_align: {i['line_align']}')
+            print(f'orientation: {i['orientation']}')
+
+
         avg_form = sum(i['letter_form'] for i in instances) / len(instances)
         avg_size = sum(i['size'] for i in instances) / len(instances)
         avg_align = sum(i['line_align'] for i in instances) / len(instances)

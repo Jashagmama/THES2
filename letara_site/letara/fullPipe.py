@@ -87,9 +87,7 @@ def preproc_char(img: MatLike, type=''):
 
 
 def template_char_check(img: MatLike):
-
-    print('template_char_check called')
-
+    
     if len(img.shape) == 3:
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     
@@ -104,12 +102,11 @@ def template_char_check(img: MatLike):
     
     # Add batch dimension
     img_predict = np.expand_dims(img_predict, axis=0)   # shape: (1, 30, 30, 1)
-
-    dummy_input = np.random.rand(1, 28, 28, 1).astype('float32')
     
-    print('template_char_check called')
     prediction = loaded_model.predict(img_predict)
     print(prediction)
+    print(f'size: {prediction.shape[1]}')
+    
     
     return img, word_dict[np.argmax(prediction)]
     # modify this such that if there is already an implementation 
@@ -176,39 +173,65 @@ def white_mask_then_inpaint(image, mask, dilate_iterations=2, inpaint_radius=5, 
 
 
 # checks what page or what worksheet set
+# Assumes that the worksheet
 def check_page(img: MatLike):
     # ROW_SIZE = 6
     # COL2_RANGE = 11
     coords = Boxman(mode='check').cells
+    # coords = fullPipe.box_man.Boxman().cells[:2]
+    print(f'coords{len(coords)}: {coords[0]} {coords[1]}')
+    # show_img(img, 'check page img')
     #add list of character ranges for each page to return the correct file path or whatever representation
     char_set = ["ABCDEFGHIJ",
                 "KLMNOPQRST",
-                "UVWXYZabcd",
-                "efghijklmn",
-                "opqrstuvwx",
-                "yz"]
+                "UVWXYZabcd",   # probably gonna have to change lowercase depending on how the model handles it
+                "efghijkl",
+                "mnopqrst",
+                "uvwxyz",
+                ]
     # check first two columns for the characters
-    img_list = []
-    first_chars = []
+
+    # first_chars = []
     print(f'check_page len coords: {len(coords)}')
+
+    max_hits = 0
+    prob_set = ""
+    
+    img_list = []
+    for chars in char_set:
+        # first_chars = []
+        curr_set = chars
+        hits = 0
+        for i in range(0, len(chars)):
+            template_char = img[coords[i].y:coords[i].y+coords[i].h,coords[i].x:coords[i].x+coords[i].w]
+            char_img, template_txt = template_char_check(template_char)
+            if template_txt == chars[i]:
+                hits += 1
+            img_list.append(char_img)
+            # first_chars.append(template_txt)
+            # max_hits = max(hits, max_hits)
+            if (hits > max_hits):
+                prob_set = curr_set
+                
+            
     for i in range (0, len(coords)): # iterate only till 2nd row
-        print('looping starts')
         template_char = img[coords[i].y:coords[i].y+coords[i].h,coords[i].x:coords[i].x+coords[i].w]
         char_img, template_txt = template_char_check(template_char)
         img_list.append(char_img)
-        first_chars.append(template_txt)
+        # first_chars.append(template_txt)
         
-    # plt.close('all')  # Close before plotting
-    # plot_imgs(img_list, 1, 2)
-    first_chars = ''.join(first_chars)
-    print(f'template_txt {first_chars}')
+    plt.close('all')  # Close before plotting
+    # plot_imgs(img_list, 1, len(img_list), 'prob_set')
+    # first_chars = ''.join(first_chars)
+    # print(f'template_txt {first_chars}')
     
-    for chars in char_set:
-        if chars[0:2].lower() == first_chars.lower():
-            print(f"Char set found: {chars}")
-            return chars
-    print("Char set not found")
-    return None
+    # for chars in char_set:
+    #     if chars[0:2].lower() == first_chars.lower():
+    #         print(f"Char set found: {chars}")
+    #         return chars
+    # print("Char set not found")
+    print(f'prob_set: {prob_set}')
+    return prob_set
 
 
 def init_boxes() -> Boxman:
@@ -399,6 +422,7 @@ def percentage_diff(n1, n2):
         return 0
     return abs(n1-n2)/(abs(n1+n2)/2) * 100
 
+# Final evaluation following the criteria
 def eval_char_final(letter, template_letter, grade='k'):
     MAX_SKEW = 45 # max acceptable skew of a character
     TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software

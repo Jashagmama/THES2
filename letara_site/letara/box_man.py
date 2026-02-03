@@ -80,12 +80,9 @@ class Boxman():
         #     coords = []
         match mode:
             case "check":
-                # Coordinates is based on non-cropped only after SIFT
-                # Coordinates only existing of the first two rows at column 1 item so, the first two template chars
                 coords = [
-                    [0,0,123,96], [3,104,121,97], # First two rows, [53,470,217,166]
+                    [0,0,123,96], [3,104,121,97], [5,205,118,96], [6,304,117,95], [5,404,118,94], [6,501,117,94], [6,602,117,96], [6,703,117,95], [6,802,117,92], [5,897,118,98]# First column
                     # [53,471,217,164], [53,643,217,167] # 3rd and 4th row
-                ]
             case "all_caps":
                 # Coordinates is based on cropped to grid locating
                 coords = [
