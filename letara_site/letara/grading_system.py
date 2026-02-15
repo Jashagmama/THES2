@@ -63,7 +63,6 @@ def grade_handwriting_by_letter(image_path):
                 'total_letters': 26,  # A-Z
                 'total_repetitions': 130,  # 26 letters × 5 repetitions
                 'grading_method': 'automatic',
-                'graded_by': 'AI System v1.0',
                 'comments': 'Overall feedback',
                 'strengths': 'What student does well',
                 'areas_for_improvement': 'What needs work'
@@ -124,17 +123,16 @@ def grade_handwriting_by_letter(image_path):
     res_img = create_result(img_out, boxes.letters)
 
     # remove this update the code to parse the new template 
-
-    # YOUR DETECTION CODE: Detect all letter instances
     # all_letters = detect_all_letter_instances(img)
 
     # Grade each instance
     letter_instances = []
     # position = 1
+    print(f'==========grading_system_debug==========')
     for i in range(NUM_ROW):
         for j in range(NUM_COL):
             curr_idx = i*NUM_COL+j
-            if j == 0 or boxes.letters[curr_idx].size < 0:  # character is a template or cell is empty
+            if j == 0 or boxes.letters[curr_idx].size <= 0:  # character is a template or cell is empty
                 continue
             else:
                 letter_instances.append(letter_to_data(boxes.letters[curr_idx], j))
@@ -151,6 +149,8 @@ def grade_handwriting_by_letter(image_path):
     # Calculate worksheet summary
     worksheet_summary = calculate_worksheet_summary(letter_summaries, letter_instances)
     
+    dump_letters(boxes)
+
     return {
         'letter_instances': letter_instances,
         'letter_summaries': letter_summaries,
@@ -228,9 +228,7 @@ def letter_to_data(letter: Letter, repetition_num):
         position: Overall position in worksheet
         bbox: Bounding box (x, y, w, h)
     """
-    repetition_num += 1 # 1 based indexing
-
-    # YOUR GRADING CODE HERE
+    # repetition_num += 1 # 1 based indexing
 
     # letter_form = analyze_letter_shape(letter_img, letter_char)
     # size = analyze_letter_size(letter_img, bbox)
@@ -240,13 +238,15 @@ def letter_to_data(letter: Letter, repetition_num):
     # comments = f"{letter_char} rep {repetition_num}: " + generate_instance_feedback(
     #     letter_form, size, alignment, orientation
     # )
+    letter_form = letter.letter_form * 100
+    print(f'char: {letter.char} \t | form: {letter.letter_form: .2f} \t | form * 100: {letter_form: .2f}')
     return {
         'letter': letter.char,
         'repetition_num': repetition_num,
-        'letter_form': letter.letter_form,
-        'size': letter.size,
-        'line_align': letter.line_align,
-        'orientation': letter.orientation
+        'letter_form': letter_form,
+        'size': letter.size_g,
+        'line_align': letter.line_align_g,
+        # 'orientation': letter.orientation
     }
     
     return {
@@ -293,18 +293,22 @@ def calculate_letter_summaries(letter_instances):
             print(f'letter_form: {i['letter_form']}')
             print(f'size: {i['size']}')
             print(f'line_align: {i['line_align']}')
-            print(f'orientation: {i['orientation']}')
+            # print(f'orientation: {i['orientation']}')
 
 
         avg_form = sum(i['letter_form'] for i in instances) / len(instances)
         avg_size = sum(i['size'] for i in instances) / len(instances)
         avg_align = sum(i['line_align'] for i in instances) / len(instances)
-        avg_orient = sum(i['orientation'] for i in instances) / len(instances)
+        # avg_orient = sum(i['orientation'] for i in instances) / len(instances)
         
-        letter_avg = (avg_form + avg_size + avg_align + avg_orient) / 4
+        letter_avg = (avg_form + avg_size + avg_align) / 3
+        # letter_avg = (avg_form + avg_size + avg_align + avg_orient) / 4
         
         # Get best and worst
-        scores = [(i['letter_form'] + i['size'] + i['line_align'] + i['orientation']) / 4 
+        # scores = [(i['letter_form'] + i['size'] + i['line_align'] + i['orientation']) / 4 
+        #           for i in instances]
+
+        scores = [(i['letter_form'] + i['size'] + i['line_align'] ) / 3 
                   for i in instances]
         
         summaries.append({
@@ -312,7 +316,7 @@ def calculate_letter_summaries(letter_instances):
             'avg_letter_form': round(avg_form, 2),
             'avg_size': round(avg_size, 2),
             'avg_line_align': round(avg_align, 2),
-            'avg_orientation': round(avg_orient, 2),
+            # 'avg_orientation': round(avg_orient, 2),
             'letter_average': round(letter_avg, 2),
             'repetition_count': len(instances),
             'best_score': round(max(scores), 2) if scores else None,
@@ -332,23 +336,26 @@ def calculate_worksheet_summary(letter_summaries, letter_instances):
     avg_form = sum(l['avg_letter_form'] for l in letter_summaries) / len(letter_summaries)
     avg_size = sum(l['avg_size'] for l in letter_summaries) / len(letter_summaries)
     avg_align = sum(l['avg_line_align'] for l in letter_summaries) / len(letter_summaries)
-    avg_orient = sum(l['avg_orientation'] for l in letter_summaries) / len(letter_summaries)
+    # avg_orient = sum(l['avg_orientation'] for l in letter_summaries) / len(letter_summaries)
     
-    overall = (avg_form + avg_size + avg_align + avg_orient) / 4
+    # overall = (avg_form + avg_size + avg_align + avg_orient) / 4
+    overall = (avg_form + avg_size + avg_align) / 3
     
     return {
         'overall_letter_form': round(avg_form, 2),
         'overall_size': round(avg_size, 2),
         'overall_line_align': round(avg_align, 2),
-        'overall_orientation': round(avg_orient, 2),
+        # 'overall_orientation': round(avg_orient, 2),
         'overall_score': round(overall, 2),
         'total_letters': len(letter_summaries),
         'total_repetitions': len(letter_instances),
         'grading_method': 'automatic',
         'graded_by': 'AI Grading System v1.0',
         'comments': generate_worksheet_comments(overall, len(letter_summaries), len(letter_instances)),
-        'strengths': identify_worksheet_strengths(avg_form, avg_size, avg_align, avg_orient),
-        'areas_for_improvement': identify_worksheet_improvements(avg_form, avg_size, avg_align, avg_orient)
+        # 'strengths': identify_worksheet_strengths(avg_form, avg_size, avg_align, avg_orient),
+        'strengths': identify_worksheet_strengths(avg_form, avg_size, avg_align),
+        # 'areas_for_improvement': identify_worksheet_improvements(avg_form, avg_size, avg_align, avg_orient)
+        'areas_for_improvement': identify_worksheet_improvements(avg_form, avg_size, avg_align)
     }
 
 
@@ -365,8 +372,10 @@ def analyze_letter_alignment(letter_img, bbox):
 def analyze_letter_orientation(letter_img):
     return 86.0
 
-def generate_instance_feedback(form, size, align, orient):
-    avg = (form + size + align + orient) / 4
+# def generate_instance_feedback(form, size, align, orient):
+def generate_instance_feedback(form, size, align):
+    # avg = (form + size + align + orient) / 4
+    avg = (form + size + align) / 3
     if avg >= 85:
         return "Excellent!"
     elif avg >= 70:
@@ -385,26 +394,29 @@ def generate_letter_summary_feedback(letter, avg_score, rep_count):
 def generate_worksheet_comments(score, unique_letters, total_reps):
     return f"Graded {unique_letters} letters ({total_reps} total instances). Overall score: {score:.1f}"
 
-def identify_worksheet_strengths(form, size, align, orient):
+# def identify_worksheet_strengths(form, size, align, orient):
+def identify_worksheet_strengths(form, size, align):
     strengths = []
     if form >= 80: strengths.append("letter formation")
     if size >= 80: strengths.append("sizing")
     if align >= 80: strengths.append("alignment")
-    if orient >= 80: strengths.append("orientation")
+    # if orient >= 80: strengths.append("orientation")
     return ", ".join(strengths) if strengths else "Keep practicing"
 
-def identify_worksheet_improvements(form, size, align, orient):
+# def identify_worksheet_improvements(form, size, align, orient):
+def identify_worksheet_improvements(form, size, align):
     improvements = []
     if form < 70: improvements.append("letter formation")
     if size < 70: improvements.append("sizing")
     if align < 70: improvements.append("alignment")
-    if orient < 70: improvements.append("orientation")
+    # if orient < 70: improvements.append("orientation")
     return ", ".join(improvements) if improvements else "Maintain current level"
 
 def default_worksheet_summary():
     return {
         'overall_letter_form': 0, 'overall_size': 0,
-        'overall_line_align': 0, 'overall_orientation': 0,
+        'overall_line_align': 0, 
+        # 'overall_orientation': 0,
         'overall_score': 0, 'total_letters': 0, 'total_repetitions': 0,
         'grading_method': 'automatic', 'graded_by': 'AI System',
         'comments': 'No letters detected', 'strengths': '', 'areas_for_improvement': ''
@@ -484,6 +496,23 @@ def default_worksheet_summary():
         'summary': summary
     }
 
+# Debugging purposes
+def dump_letters(boxes):
+    print(len(boxes.letters))
+    written_acc = 0
+    ROW_CNT = 10
+    COL_CNT = 6
+    for i in range(ROW_CNT):
+        for j in range(COL_CNT):
+            if boxes.letters[i * COL_CNT + j].size > 0 and j != 0:
+                curr_letter = boxes.letters[i * COL_CNT + j]
+                print(f'char: {curr_letter.char}', end='\t')
+                print(f'| idx: [{i}][{j}]\t | size: {curr_letter.size}')
+                written_acc += 1
+
+            
+    print(written_acc)
+
 
 def detect_letters(img):
     """
@@ -560,7 +589,7 @@ def grade_single_letter(letter_img, letter_char, letter_number, bbox):
     letter_form_score = analyze_letter_shape(letter_img, letter_char)
     size_score = analyze_letter_size(letter_img, bbox)
     alignment_score = analyze_letter_alignment(letter_img, bbox)
-    orientation_score = analyze_letter_orientation(letter_img)
+    # orientation_score = analyze_letter_orientation(letter_img)
     
     # Generate feedback
     comments = generate_letter_feedback(
@@ -568,7 +597,7 @@ def grade_single_letter(letter_img, letter_char, letter_number, bbox):
         letter_form_score,
         size_score,
         alignment_score,
-        orientation_score
+        # orientation_score
     )
     
     return {
@@ -577,7 +606,7 @@ def grade_single_letter(letter_img, letter_char, letter_number, bbox):
         'letter_form': letter_form_score,
         'size': size_score,
         'line_align': alignment_score,
-        'orientation': orientation_score,
+        # 'orientation': orientation_score,
         'bbox_x': bbox[0],
         'bbox_y': bbox[1],
         'bbox_width': bbox[2],

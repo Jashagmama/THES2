@@ -225,7 +225,7 @@ def auto_grade_worksheet(request, pk):
                 letter_form=instance_data['letter_form'],
                 size=instance_data['size'],
                 line_align=instance_data['line_align'],
-                orientation=instance_data['orientation'],
+                orientation=0, #temp workaround
                 bbox_x=instance_data.get('bbox_x'),
                 bbox_y=instance_data.get('bbox_y'),
                 bbox_width=instance_data.get('bbox_width'),
@@ -241,7 +241,7 @@ def auto_grade_worksheet(request, pk):
                 avg_letter_form=summary_data['avg_letter_form'],
                 avg_size=summary_data['avg_size'],
                 avg_line_align=summary_data['avg_line_align'],
-                avg_orientation=summary_data['avg_orientation'],
+                avg_orientation=0, # 0 for now will remove it once finalized
                 letter_average=summary_data['letter_average'],
                 repetition_count=summary_data['repetition_count'],
                 best_score=summary_data.get('best_score'),
@@ -256,7 +256,8 @@ def auto_grade_worksheet(request, pk):
             overall_letter_form=ws_data['overall_letter_form'],
             overall_size=ws_data['overall_size'],
             overall_line_align=ws_data['overall_line_align'],
-            overall_orientation=ws_data['overall_orientation'],
+            # overall_orientation=ws_data['overall_orientation'],
+            overall_orientation=0, # 0 for now will remove once finalized
             overall_score=ws_data['overall_score'],
             total_letters=ws_data['total_letters'],
             total_repetitions=ws_data['total_repetitions'],

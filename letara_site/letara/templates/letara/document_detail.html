@@ -130,10 +130,11 @@
                                     <span>📐 Line Alignment</span>
                                     <strong>{{ summary.overall_line_align|floatformat:1 }}/100</strong>
                                 </li>
-                                <li class="list-group-item d-flex justify-content-between">
-                                    <span>↗️ Orientation</span>
-                                    <strong>{{ summary.overall_orientation|floatformat:1 }}/100</strong>
-                                </li>
+                                <!-- Comment out orientation info here -->
+                                <!-- <li class="list-group-item d-flex justify-content-between"> -->
+                                <!--     <span>↗️ Orientation</span> -->
+                                <!--     <strong>{{ summary.overall_orientation|floatformat:1 }}/100</strong> -->
+                                <!-- </li> -->
                             </ul>
                             <div class="mt-3">
                                 <p class="mb-0"><strong>Letters Graded:</strong> {{ document.get_letter_count }}</p>
@@ -173,7 +174,8 @@
                                         <th>Avg Form</th>
                                         <th>Avg Size</th>
                                         <th>Avg Align</th>
-                                        <th>Avg Orient</th>
+                                        <!-- orient info here -->
+                                        <!-- <th>Avg Orient</th> -->
                                         <th>Overall Avg</th>
                                         <th>Grade</th>
                                         <th>Best</th>
@@ -187,7 +189,8 @@
                                         <td>{{ letter_summary.avg_letter_form|floatformat:1 }}</td>
                                         <td>{{ letter_summary.avg_size|floatformat:1 }}</td>
                                         <td>{{ letter_summary.avg_line_align|floatformat:1 }}</td>
-                                        <td>{{ letter_summary.avg_orientation|floatformat:1 }}</td>
+                                        <!-- orient info here -->
+                                        <!-- <td>{{ letter_summary.avg_orientation|floatformat:1 }}</td> -->
                                         <td><strong>{{ letter_summary.letter_average|floatformat:1 }}</strong></td>
                                         <td><span class="badge bg-primary">{{ letter_summary.get_letter_grade }}</span></td>
                                         <td class="text-success">{{ letter_summary.best_score|floatformat:1 }}</td>
@@ -207,26 +210,26 @@
                                 <table class="table table-sm table-hover">
                                     <thead>
                                         <tr>
-                                            <th>Pos</th>
                                             <th>Letter</th>
                                             <th>Rep</th>
                                             <th>Form</th>
                                             <th>Size</th>
                                             <th>Align</th>
-                                            <th>Orient</th>
+                                            <!-- orient info here -->
+                                            <!-- <th>Orient</th> -->
                                             <th>Avg</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for instance in document.letter_grades.all %}
                                         <tr>
-                                            <td>{{ instance.position_in_worksheet }}</td>
                                             <td><strong>{{ instance.letter }}</strong></td>
                                             <td>{{ instance.repetition_number }}</td>
                                             <td>{{ instance.letter_form|floatformat:0 }}</td>
                                             <td>{{ instance.size|floatformat:0 }}</td>
                                             <td>{{ instance.line_align|floatformat:0 }}</td>
-                                            <td>{{ instance.orientation|floatformat:0 }}</td>
+                                            <!-- orient info here -->
+                                            <!-- <td>{{ instance.orientation|floatformat:0 }}</td> -->
                                             <td><strong>{{ instance.get_instance_score|floatformat:0 }}</strong></td>
                                         </tr>
                                         {% endfor %}

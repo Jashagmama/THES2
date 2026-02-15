@@ -1,6 +1,7 @@
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 from .box_man import *
 
@@ -20,6 +21,9 @@ from cv2.typing import MatLike
 # keras
 from keras.models import load_model
 
+# Temporary set tensorflow to use cpu only
+tf.config.set_visible_devices([], 'GPU')
+
 model_path = (
     Path(settings.BASE_DIR)
         / "letara"
@@ -37,7 +41,7 @@ word_dict = {
 }
 
 def plot_imgs(imgs: list, n_row, n_col, file_name=''):
-    plt.close('all')  # Close any existing figures FIRST
+    # plt.close('all')  # Close any existing figures FIRST
     
     _, axs = plt.subplots(n_row, n_col, figsize=(12, 12))
     axs = axs.flatten()
@@ -213,14 +217,14 @@ def check_page(img: MatLike):
             if (hits > max_hits):
                 prob_set = curr_set
                 
-            
-    for i in range (0, len(coords)): # iterate only till 2nd row
-        template_char = img[coords[i].y:coords[i].y+coords[i].h,coords[i].x:coords[i].x+coords[i].w]
-        char_img, template_txt = template_char_check(template_char)
-        img_list.append(char_img)
+    # debugging purposes
+    # for i in range (0, len(coords)): # iterate only till 2nd row
+    #     template_char = img[coords[i].y:coords[i].y+coords[i].h,coords[i].x:coords[i].x+coords[i].w]
+    #     char_img, template_txt = template_char_check(template_char)
+    #     img_list.append(char_img)
         # first_chars.append(template_txt)
         
-    plt.close('all')  # Close before plotting
+    # plt.close('all')  # Close before plotting
     # plot_imgs(img_list, 1, len(img_list), 'prob_set')
     # first_chars = ''.join(first_chars)
     # print(f'template_txt {first_chars}')
@@ -241,6 +245,7 @@ def init_boxes() -> Boxman:
 
 # preprocess isolated charcter
 def preproc_char_iso(img: MatLike, type=''):
+    # show_img(img, 'preproc_char_iso input')
     if len(img.shape) == 3:
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     
@@ -249,7 +254,7 @@ def preproc_char_iso(img: MatLike, type=''):
     
     # Sauvola thresholding
     window_size = 25
-    thresh_sauvola = threshold_sauvola(img, window_size=window_size) 
+    thresh_sauvola = threshold_sauvola(img, window_size=window_size, k=0.1) 
     img = img > thresh_sauvola
     
     # Convert boolean to uint8 (0 and 255)
@@ -260,10 +265,30 @@ def preproc_char_iso(img: MatLike, type=''):
 
     # dilate expects white fg and black bg
     if type.strip() == 'hw':
-        kernel = np.ones((8, 8), np.uint8)
+        kernel = np.ones((12, 12), np.uint8)
         img = cv.dilate(img, kernel, iterations=1)
+        
+        kernel = np.ones((3, 3), np.uint8)
+        # Apply erosion
+        img = cv.erode(img, kernel, iterations=1)
     
+    # Crop to bounding box
+    # coords = cv.findNonZero(img)
+    # if coords is not None:
+    #     x, y, w, h = cv.boundingRect(coords)
+    #     img = img[y:y+h, x:x+w]
+    
+    # Add padding
+    pad = 10
+    img = cv.copyMakeBorder(img, pad, pad, pad, pad, 
+                            cv.BORDER_CONSTANT, value=0)
+    
+    # Resize to square
+    # img = cv.resize(img, (28, 28))
+    
+    # invert again to get white bg and black fg
     img = cv.bitwise_not(img)
+    # show_img(img, 'preproc_char_iso')
     
     return img
 
@@ -383,22 +408,16 @@ def eval_size_align(img):
     contours = contours[0] if len(contours) == 2 else contours[1]
     for cntr in contours:
         x,y,w,h = cv.boundingRect(cntr)
-        if cv.contourArea(cntr) < 200:
+
+        if cv.contourArea(cntr) < 200: # skips the contour found if its area is smaller than 200
             continue
-        # if filename == './dataset/dd/train_44_03054.png':
-        #     print('=====Error=====')
-        #     print(f'x:{x}, y:{y}, w:{w}, h:{h}')
-        #     isError = True
-        # if x == 0 and y == 0 and w == width and h == height:
-        #     print(f'skipping {filename}')
-        #     skip_cnt = skip_cnt + 1
-        #     continue
+
         true_x = min(true_x, x)
         true_y = min(true_y, y)
 
         true_x2 = max(true_x2, x + w)
         true_y2 = max(true_y2, y + h)
-        cv.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+        # cv.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
 
         print(f'contourArea: {cv.contourArea(cntr)}')
         # print("x,y,w,h:",x,y,w,h)
@@ -423,48 +442,52 @@ def percentage_diff(n1, n2):
     return abs(n1-n2)/(abs(n1+n2)/2) * 100
 
 # Final evaluation following the criteria
-def eval_char_final(letter, template_letter, grade='k'):
-    MAX_SKEW = 45 # max acceptable skew of a character
-    TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
-    match grade.strip().lower():
-        case 'k':
-            # print('Kinder rubric selected')
-            letter_form_percent = 60
-            line_align_percent = 40
-            orientation_percent = 60
-            size_percent = 50
-        case '1':
-            # print('Grade 1 rubric selected')
-            letter_form_percent = 40
-            line_align_percent = 20
-            orientation_percent = 40
-            size_percent = 30
-        case '2':
-            letter_form_percent = 20
-            line_align_percent = 10
-            orientation_percent = 20
-            size_percent = 10   # changed from 5 to 10 despite rubric 
-                                # due to parts of template may be removed when removing grid
+def eval_char_final(letter: Letter, template_letter: Letter, grade='k'):
+    letter.size_g = 100 - percentage_diff(letter.size, template_letter.size)
+    letter.line_align_g = 100 - percentage_diff(letter.line_align, template_letter.line_align)
+    # MAX_SKEW = 45 # max acceptable skew of a character
+    # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
+    # match grade.strip().lower():
+    #     case 'k':
+    #         # print('Kinder rubric selected')
+    #         letter_form_percent = 60
+    #         line_align_percent = 40
+    #         orientation_percent = 60
+    #         size_percent = 50
+    #     case '1':
+    #         # print('Grade 1 rubric selected')
+    #         letter_form_percent = 40
+    #         line_align_percent = 20
+    #         orientation_percent = 40
+    #         size_percent = 30
+    #     case '2':
+    #         letter_form_percent = 20
+    #         line_align_percent = 10
+    #         orientation_percent = 20
+    #         size_percent = 10   # changed from 5 to 10 despite rubric 
+    #                             # due to parts of template may be removed when removing grid
             
     # Calculate individual statuses
-    letter.letter_form_status = (100 - letter.letter_form * 100 <= letter_form_percent)
+    # letter.letter_form_status = (100 - letter.letter_form * 100 <= letter_form_percent)
     # or (percentage_diff(letter.letter_form, template_letter.letter_form) <= letter_form_percent)
     # letter.orientation_status = abs(letter.orientation) <= abs(template_letter.orientation) or (percentage_diff(letter.orientation, template_letter.orientation) <= orientation_percent)
     # letter.orientation_status = True
-    letter.orientation_status = (100 * (abs(letter.orientation) / MAX_SKEW)) <= orientation_percent
-    letter.size_status = (percentage_diff(letter.size, TRUE_HEIGHT) <= size_percent) or (percentage_diff(letter.size, template_letter.size) <= size_percent)
-    letter.line_align_status = abs(letter.line_align) <= abs(template_letter.line_align) or (percentage_diff(letter.line_align, template_letter.line_align) <= line_align_percent)
+    # letter.orientation_status = (100 * (abs(letter.orientation) / MAX_SKEW)) <= orientation_percent
+    # letter.size_status = (percentage_diff(letter.size, TRUE_HEIGHT) <= size_percent) or (percentage_diff(letter.size, template_letter.size) <= size_percent)
+    # letter.line_align_status = abs(letter.line_align) <= abs(template_letter.line_align) or (percentage_diff(letter.line_align, template_letter.line_align) <= line_align_percent)
     
     # Combine into single grade with equal weighting
-    statuses = [
-        letter.letter_form_status,
-        letter.orientation_status,
-        letter.size_status,
-        letter.line_align_status
-    ]
+    # statuses = [
+    #     letter.letter_form_status,
+    #     letter.orientation_status,
+    #     letter.size_status,
+    #     letter.line_align_status
+    # ]
+    #
+    # letter.overall_status = sum(statuses) / len(statuses) >= 0.5  # Returns True if 50%+ pass
+    # letter.overall_status = letter.size > 0 and letter.overall_status
+
     
-    letter.overall_status = sum(statuses) / len(statuses) >= 0.5  # Returns True if 50%+ pass
-    letter.overall_status = letter.size > 0 and letter.overall_status
 
 # resize character
 def resize_cr(img: MatLike):
@@ -865,7 +888,7 @@ if __name__ == "__main__":
 
         print("\n--- Remove Red Lines ---")
         result, mask = detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
-        image_processed, white_telea = white_mask_then_inpaint(grid_removed, mask, dilate_iterations=1, inpaint_radius=1, method='telea')
+        image_processed, white_telea = white_mask_then_inpaint(grid_removed, mask, dilate_iterations=2, inpaint_radius=1, method='telea')
 
         char_set = check_page(image_processed)
         print(f"chars: {char_set}")
