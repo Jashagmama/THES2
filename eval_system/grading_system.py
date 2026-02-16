@@ -7,10 +7,11 @@ import cv2 as cv
 import numpy as np
 
 from PIL import Image
-from django.conf import settings
+from numpy._core.numeric import full
 from tensorflow import size
 
-from .fullPipe import *
+import fullPipe
+import box_man
 
 def grade_handwriting_by_letter(image_path):
     """
@@ -79,21 +80,21 @@ def grade_handwriting_by_letter(image_path):
     num_row = 10
     NUM_COL = 6
 
-    template_img = cv.imread(os.path.join(settings.STATICFILES_DIRS[0], "ws_template", "A-J.png"))
+    template_img = cv.imread('../template/A-J.png')
     ws_img = cv.imread(image_path)
     print(f'image_path: {image_path}')
 
     assert ws_img is not None, "Image is not found"
 
     # init box coords
-    boxes = init_boxes()
+    boxes = fullPipe.init_boxes()
     # if ws_img is None:
     #     raise ValueError("Could not load image")
     print("\n--- SIFT Alignment ---")
-    sift_aligned = align_documents_sift(template_img, ws_img, "2_sift.png")
+    sift_aligned = fullPipe.align_documents_sift(template_img, ws_img, "2_sift.png")
 
     print("\n--- Shadow Removal ---")
-    shadow_removed = remove_shadow(sift_aligned)
+    shadow_removed = fullPiperemove_shadow(sift_aligned)
     cv.imwrite("removed_shadow.png", shadow_removed)
 
     # num_enclosed = count_rect(shadow_removed) # don't need this anymore
@@ -103,25 +104,25 @@ def grade_handwriting_by_letter(image_path):
 
 
 
-    grid_removed = remove_grid(perspective_corrected)
+    grid_removed = fullPipe.remove_grid(perspective_corrected)
     print("\n--- Remove Red Lines ---")
-    result2, mask2 = detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
-    inpainted2_telea, _ = white_mask_then_inpaint(grid_removed, mask2, dilate_iterations=2, inpaint_radius=3, method='telea')
+    result2, mask2 = fullPipe.detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
+    inpainted2_telea, _ = fullPipe.white_mask_then_inpaint(grid_removed, mask2, dilate_iterations=2, inpaint_radius=3, method='telea')
     image_processed = inpainted2_telea
     cv.imwrite("./red_removed.png", image_processed)
 # image_processed = fullPipe.remove_colored_lines(grid_removed, "4_no_red.png")
 # image_processed = 
 
 # add thresholding here before passing to eval_letters
-    char_set = check_page(image_processed)
+    char_set = fullPipe.check_page(image_processed)
     print(f"chars: {char_set}")
-    boxes = Boxman(box_lut(char_set))
+    boxes = box_man.Boxman(fullPipe.box_lut(char_set))
 
     print("\n--- Eval Letters ---")
-    eval_letters(image_processed, boxes, char_set) 
+    fullPipe.eval_letters(image_processed, boxes, char_set) 
 
     img_out = perspective_corrected.copy()
-    res_img = create_result(img_out, boxes.letters)
+    res_img = fullPipe.create_result(img_out, boxes.letters)
 
     # remove this update the code to parse the new template 
     # all_letters = detect_all_letter_instances(img)
@@ -130,7 +131,7 @@ def grade_handwriting_by_letter(image_path):
     letter_instances = []
     num_row = len(char_set)
     # position = 1
-    # print(f'==========grading_system_debug==========')
+    print(f'==========grading_system_debug==========')
     for i in range(num_row):
         for j in range(NUM_COL):
             curr_idx = i*NUM_COL+j
@@ -151,7 +152,7 @@ def grade_handwriting_by_letter(image_path):
     # Calculate worksheet summary
     worksheet_summary = calculate_worksheet_summary(letter_summaries, letter_instances)
     
-    # dump_letters(boxes, num_row)
+    dump_letters(boxes, num_row)
 
     return {
         'letter_instances': letter_instances,
@@ -219,7 +220,7 @@ def detect_all_letter_instances(img):
     return all_letters
 
 
-def letter_to_data(letter: Letter, repetition_num):
+def letter_to_data(letter: box_man.Letter, repetition_num):
     """
     Grade a single letter instance
     
@@ -240,14 +241,14 @@ def letter_to_data(letter: Letter, repetition_num):
     # comments = f"{letter_char} rep {repetition_num}: " + generate_instance_feedback(
     #     letter_form, size, alignment, orientation
     # )
-    print(f'letter_g: {letter.letter_g}  |  lettter.size_g: {letter.size_g}  |  line_align: {letter.line_align_g}')
-    letter_form = transmute_grade(letter.letter_g)
+    letter_form = letter.letter_form * 100
+    print(f'char: {letter.char} \t | form: {letter.letter_form: .2f} \t | form * 100: {letter_form: .2f}')
     return {
         'letter': letter.char,
         'repetition_num': repetition_num,
         'letter_form': letter_form,
-        'size': transmute_grade(letter.size_g),
-        'line_align': transmute_grade(letter.line_align_g),
+        'size': letter.size_g,
+        'line_align': letter.line_align_g,
         # 'orientation': letter.orientation
     }
     
@@ -616,190 +617,6 @@ def grade_single_letter(letter_img, letter_char, letter_number, bbox):
         'comments': comments
     }
 
+if __name__ == "__main__":
+    print("test")
 
-# ========================================
-# ANALYSIS FUNCTIONS FOR INDIVIDUAL LETTERS
-# Replace these with your actual implementations
-# ========================================
-
-# def analyze_letter_shape(letter_img, letter_char):
-#     """
-#     Analyze if letter matches expected shape
-#
-#     YOUR CODE HERE:
-#     - Compare with template/ideal letter shape
-#     - Use feature matching
-#     - Score based on similarity
-#
-#     Returns: float (0-100)
-#     """
-#     # Placeholder
-#     return 85.0
-#
-#
-# def analyze_letter_size(letter_img, bbox):
-#     """
-#     Check if letter size is appropriate
-#
-#     YOUR CODE HERE:
-#     - Compare height/width to expected size
-#     - Check consistency with other letters
-#
-#     Returns: float (0-100)
-#     """
-#     # Placeholder
-#     height = bbox[3]
-#
-#     # Example: Check if height is within expected range
-#     expected_height_range = (40, 80)  # Adjust based on your worksheet
-#     if expected_height_range[0] <= height <= expected_height_range[1]:
-#         return 90.0
-#     else:
-#         deviation = abs(height - np.mean(expected_height_range))
-#         score = max(0, 90 - deviation)
-#         return float(score)
-#
-#
-# def analyze_letter_alignment(letter_img, bbox):
-#     """
-#     Check baseline alignment
-#
-#     YOUR CODE HERE:
-#     - Compare y-coordinate with baseline
-#     - Check if letter sits properly on line
-#
-#     Returns: float (0-100)
-#     """
-#     # Placeholder
-#     return 80.0
-#
-#
-# def analyze_letter_orientation(letter_img):
-#     """
-#     Check letter slant and orientation
-#
-#     YOUR CODE HERE:
-#     - Detect vertical/diagonal lines
-#     - Measure slant angle
-#     - Compare to expected orientation
-#
-#     Returns: float (0-100)
-#     """
-#     # Placeholder
-#     return 88.0
-#
-#
-# def generate_letter_feedback(letter_char, form, size, align, orient):
-#     """Generate feedback for individual letter"""
-#     scores = {'form': form, 'size': size, 'align': align, 'orient': orient}
-#     lowest = min(scores, key=scores.get)
-#
-#     feedback_map = {
-#         'form': f"Letter {letter_char}: Work on letter shape",
-#         'size': f"Letter {letter_char}: Adjust letter size",
-#         'align': f"Letter {letter_char}: Improve baseline alignment",
-#         'orient': f"Letter {letter_char}: Check letter slant"
-#     }
-#
-#     if scores[lowest] < 70:
-#         return feedback_map[lowest]
-#     return f"Letter {letter_char}: Good work!"
-#
-#
-# def calculate_summary(letter_grades):
-#     """
-#     Calculate overall summary from all letter grades
-#
-#     Args:
-#         letter_grades: List of individual letter grade dicts
-#
-#     Returns:
-#         dict: Summary data
-#     """
-#     if not letter_grades:
-#         return {
-#             'overall_letter_form': 0,
-#             'overall_size': 0,
-#             'overall_line_align': 0,
-#             'overall_orientation': 0,
-#             'overall_score': 0,
-#             'grading_method': 'automatic',
-#             'graded_by': 'AI Grading System',
-#             'comments': 'No letters detected',
-#             'strengths': 'N/A',
-#             'areas_for_improvement': 'N/A'
-#         }
-#
-#     # Calculate averages
-#     avg_form = sum(g['letter_form'] for g in letter_grades) / len(letter_grades)
-#     avg_size = sum(g['size'] for g in letter_grades) / len(letter_grades)
-#     avg_align = sum(g['line_align'] for g in letter_grades) / len(letter_grades)
-#     avg_orient = sum(g['orientation'] for g in letter_grades) / len(letter_grades)
-#
-#     overall = (avg_form + avg_size + avg_align + avg_orient) / 4
-#
-#     # Generate overall feedback
-#     comments = generate_overall_comments(overall, len(letter_grades))
-#     strengths = identify_worksheet_strengths(avg_form, avg_size, avg_align, avg_orient)
-#     improvements = identify_worksheet_improvements(avg_form, avg_size, avg_align, avg_orient)
-#
-#     return {
-#         'overall_letter_form': round(avg_form, 2),
-#         'overall_size': round(avg_size, 2),
-#         'overall_line_align': round(avg_align, 2),
-#         'overall_orientation': round(avg_orient, 2),
-#         'overall_score': round(overall, 2),
-#         'grading_method': 'automatic',
-#         'graded_by': 'AI Grading System v1.0',
-#         'comments': comments,
-#         'strengths': strengths,
-#         'areas_for_improvement': improvements
-#     }
-#
-#
-# def generate_overall_comments(score, letter_count):
-#     """Generate overall comments"""
-#     if score >= 90:
-#         return f"Excellent handwriting across all {letter_count} letters!"
-#     elif score >= 80:
-#         return f"Very good work on {letter_count} letters with room for improvement."
-#     elif score >= 70:
-#         return f"Good effort on {letter_count} letters. Keep practicing!"
-#     elif score >= 60:
-#         return f"Adequate work on {letter_count} letters. Focus on consistency."
-#     else:
-#         return f"Needs improvement. Practice the {letter_count} letters regularly."
-#
-#
-# def identify_worksheet_strengths(form, size, align, orient):
-#     """Identify strengths across all letters"""
-#     strengths = []
-#     if form >= 80:
-#         strengths.append("consistent letter formation")
-#     if size >= 80:
-#         strengths.append("appropriate letter sizing")
-#     if align >= 80:
-#         strengths.append("good baseline alignment")
-#     if orient >= 80:
-#         strengths.append("proper letter orientation")
-#
-#     if strengths:
-#         return f"Strong {', '.join(strengths)} throughout the worksheet."
-#     return "Continue practicing to develop strengths."
-#
-#
-# def identify_worksheet_improvements(form, size, align, orient):
-#     """Identify areas needing work"""
-#     improvements = []
-#     if form < 70:
-#         improvements.append("letter formation")
-#     if size < 70:
-#         improvements.append("letter sizing consistency")
-#     if align < 70:
-#         improvements.append("baseline alignment")
-#     if orient < 70:
-#         improvements.append("letter orientation")
-#
-#     if improvements:
-#         return f"Focus on improving {', '.join(improvements)} across all letters."
-#     return "Maintain your current level of performance."

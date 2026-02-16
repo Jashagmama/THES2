@@ -3,15 +3,14 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-from .box_man import *
+import box_man
 
-from math import ceil, floor
+from math import ceil
 from jdeskew.estimator import get_angle
 from jdeskew.utility import rotate
 from skimage.filters import threshold_sauvola
 
 from pathlib import Path
-from django.conf import settings
 
 
 # Typings
@@ -25,17 +24,11 @@ from keras.models import load_model
 tf.config.set_visible_devices([], 'GPU')
 
 model_path = (
-    Path(settings.BASE_DIR)
-        / "letara"
-        / "model"
-        / "handwriting_MNIST.keras"
+    "../model/handwriting_MNIST.keras"
 )
 
 model_path_lc = (
-    Path(settings.BASE_DIR)
-        / "letara"
-        / "model"
-        / "hwv1.keras"
+    "../model/hwv1.keras"
 )
 
 # model_path = 'letara'
@@ -153,20 +146,27 @@ def template_char_check(img: MatLike):
     # dup = img.copy()
     true_w = true_x2 - true_x
     true_h = true_y2 - true_y
+    bottom = height - true_y2 # distance from bottom
+    top = height - true_y
     # print(f'len contours: {len(contours)}')
     # cv.rectangle(dup, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 5)
     # show_img(dup, 'img @ char_check')
     # print("x,y,w,h:",true_x,true_y,true_w,true_h)
     # print(f"returns {true_h}, {bottom}")
 
-    cropped_to_bbox = img[true_y:true_y+true_h, true_x:true_x+true_w]
+    cropped_to_bbox = img[y:y+h, x:x+w]
     pad = 10
     cropped = cv.copyMakeBorder(cropped_to_bbox, pad, pad, pad, pad, 
                             cv.BORDER_CONSTANT, value=0)
     print(f'true_h: {true_h}')
     img = cv.resize(cropped, (28, 28))
-
-    img_predict = img_format(img)
+    img = img.astype('float32') / 255.0
+    
+    # Add channel dimension (if model expects 1 channel)
+    img_predict = np.expand_dims(img, axis=-1)  # shape: (30, 30, 1)
+    
+    # Add batch dimension
+    img_predict = np.expand_dims(img_predict, axis=0)   # shape: (1, 30, 30, 1)
 
     if true_h > 60:
         prediction = loaded_model.predict(img_predict)       
@@ -318,9 +318,9 @@ def check_page(img: MatLike):
     return prob_set
 
 
-def init_boxes(mode='all_caps') -> Boxman:
+def init_boxes(mode='all_caps') -> box_man.Boxman:
     print(f'selected mode: {mode}')
-    boxes = Boxman(mode)
+    boxes = box_man.Boxman(mode)
     # boxes.print_all()
     return boxes
 
@@ -541,101 +541,10 @@ def percentage_diff(n1, n2, eps=1e-8):
         return 0
     return abs(n1 - n2) / denom * 100
 
-# base 60 Transmutation table used by deped
-def transmute_grade(score: float) -> int:
-    if score >= 100:
-        return 100
-    elif 98.40 <= score < 100:
-        return 99
-    elif 96.80 <= score <= 98.39:
-        return 98
-    elif 95.20 <= score <= 96.79:
-        return 97
-    elif 93.60 <= score <= 95.19:
-        return 96
-    elif 92.00 <= score <= 93.59:
-        return 95
-    elif 90.40 <= score <= 91.99:
-        return 94
-    elif 88.80 <= score <= 90.39:
-        return 93
-    elif 87.20 <= score <= 88.79:
-        return 92
-    elif 85.60 <= score <= 87.19:
-        return 91
-    elif 84.00 <= score <= 85.59:
-        return 90
-    elif 82.40 <= score <= 83.99:
-        return 89
-    elif 80.80 <= score <= 82.39:
-        return 88
-    elif 79.20 <= score <= 80.79:
-        return 87
-    elif 77.60 <= score <= 79.19:
-        return 86
-    elif 76.00 <= score <= 77.59:
-        return 85
-    elif 74.40 <= score <= 75.99:
-        return 84
-    elif 72.80 <= score <= 74.39:
-        return 83
-    elif 71.20 <= score <= 72.79:
-        return 82
-    elif 69.60 <= score <= 71.19:
-        return 81
-    elif 68.00 <= score <= 69.59:
-        return 80
-    elif 66.40 <= score <= 67.99:
-        return 79
-    elif 64.80 <= score <= 66.39:
-        return 78
-    elif 63.20 <= score <= 64.79:
-        return 77
-    elif 61.60 <= score <= 63.19:
-        return 76
-    elif 60.00 <= score <= 61.59:
-        return 75
-    elif 56.00 <= score <= 59.99:
-        return 74
-    elif 52.00 <= score <= 55.99:
-        return 73
-    elif 48.00 <= score <= 51.99:
-        return 72
-    elif 44.00 <= score <= 47.99:
-        return 71
-    elif 40.00 <= score <= 43.99:
-        return 70
-    elif 36.00 <= score <= 39.99:
-        return 69
-    elif 32.00 <= score <= 35.99:
-        return 68
-    elif 28.00 <= score <= 31.99:
-        return 67
-    elif 24.00 <= score <= 27.99:
-        return 66
-    elif 20.00 <= score <= 23.99:
-        return 65
-    elif 16.00 <= score <= 19.99:
-        return 64
-    elif 12.00 <= score <= 15.99:
-        return 63
-    elif 8.00 <= score <= 11.99:
-        return 62
-    elif 4.00 <= score <= 7.99:
-        return 61
-    elif 0.00 <= score <= 3.99:
-        return 60
-    else:
-        print(f'score: {score}')
-        raise ValueError("Score must be between 0 and 100.")
-
 # Final evaluation following the criteria
-def eval_char_final(letter: Letter, template_letter: Letter):
-    # Transmutation table
-    letter.letter_g     = (letter.letter_form * 100)
+def eval_char_final(letter: box_man.Letter, template_letter: box_man.Letter, grade='k'):
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
     letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
-
     # MAX_SKEW = 45 # max acceptable skew of a character
     # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
     # match grade.strip().lower():

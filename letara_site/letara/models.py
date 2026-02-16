@@ -149,7 +149,7 @@ class LetterGrade(models.Model):
         """Calculate score for this instance"""
         if self.instance_score is not None:
             return self.instance_score
-        score = (self.letter_form + self.size + self.line_align + self.orientation) / 4
+        score = (self.letter_form + self.size + self.line_align) / 3
         return round(score, 2)
     
     def save(self, *args, **kwargs):
