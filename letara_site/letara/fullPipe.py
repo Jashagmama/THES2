@@ -552,6 +552,7 @@ def transmute_grade(initial_grade):
     Returns:
         float: The transmuted grade (60-100)
     """
+    initial_grade = round(initial_grade, 2)
     # Grade conversion table: (min_initial, max_initial, transmuted)
     grade_table = [
         (100, 100, 100),
