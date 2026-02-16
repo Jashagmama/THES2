@@ -94,13 +94,13 @@ def grade_handwriting_by_letter(image_path):
     sift_aligned = fullPipe.align_documents_sift(template_img, ws_img, "2_sift.png")
 
     print("\n--- Shadow Removal ---")
-    shadow_removed = fullPiperemove_shadow(sift_aligned)
+    shadow_removed = fullPipe.remove_shadow(sift_aligned)
     cv.imwrite("removed_shadow.png", shadow_removed)
 
     # num_enclosed = count_rect(shadow_removed) # don't need this anymore
 
     print("\n--- Perspective Correction ---")
-    perspective_corrected = correct_perspective(shadow_removed, "3_corrTab.png")
+    perspective_corrected = fullPipe.correct_perspective(shadow_removed, "3_corrTab.png")
 
 
 
@@ -618,5 +618,4 @@ def grade_single_letter(letter_img, letter_char, letter_number, bbox):
     }
 
 if __name__ == "__main__":
-    print("test")
-
+    grade_handwriting_by_letter("../worksheets/e-l_01.jpg")

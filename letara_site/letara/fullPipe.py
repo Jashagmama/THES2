@@ -764,13 +764,19 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-    # homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
+    homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
 
-    homography, _ = cv.findHomography(
+    # homography, _ = cv.findHomography(
+    #     dst_pts, src_pts, 
+    #     cv.USAC_MAGSAC,  
+    #     ransacReprojThreshold=3.0,
+    #     maxIters=5000
+    # )
+
+    homography, mask = cv.findHomography(
         dst_pts, src_pts, 
-        cv.USAC_MAGSAC,  
-        ransacReprojThreshold=5.0,
-        maxIters=5000
+        cv.RANSAC, 
+        5.0
     )
     if homography is None:
         raise ValueError("❌ Could not compute homography.")

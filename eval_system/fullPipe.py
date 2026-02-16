@@ -242,7 +242,7 @@ def white_mask_then_inpaint(image, mask, dilate_iterations=2, inpaint_radius=5, 
 def check_page(img: MatLike):
     # ROW_SIZE = 6
     # COL2_RANGE = 11
-    coords = Boxman(mode='check').cells
+    coords = box_man.Boxman(mode='check').cells
     # coords = fullPipe.box_man.Boxman().cells[:2]
     # print(f'coords{len(coords)}: {coords[0]} {coords[1]}')
     # show_img(img, 'check page img')
