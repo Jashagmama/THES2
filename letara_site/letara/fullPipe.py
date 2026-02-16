@@ -543,6 +543,7 @@ def percentage_diff(n1, n2, eps=1e-8):
 
 # base 60 Transmutation table used by deped
 def transmute_grade(score: float) -> int:
+    score = round(score, 2)
     if score >= 100:
         return 100
     elif 98.40 <= score < 100:
