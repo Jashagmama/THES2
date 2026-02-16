@@ -143,8 +143,8 @@ def check_page(img: MatLike):
     return None
 
 
-def init_boxes() -> box_man.Boxman:
-    boxes = box_man.Boxman(mode='all_caps')
+def init_boxes(mode='all_caps') -> box_man.Boxman:
+    boxes = box_man.Boxman(mode)
     # boxes.print_all()
     return boxes
 

@@ -30,13 +30,13 @@ class Letter:
         self.letter_form_status = False
         self.line_align_status = False
         self.size_status = False
-        self.orientation_status = False
+        # self.orientation_status = False
         self.is_template = is_template
 
 
     def isPass(self):
         return (self.letter_form_status and self.line_align_status and
-                self.size_status and self.orientation_status)
+                self.size_status)
 
     def print_coords(self):
         print(f"x: {self.box.x}, y: {self.box.y}, w: {self.box.w}, h: {self.box.h}")
@@ -46,17 +46,13 @@ class Letter:
         print(f'letter_form_status: {self.letter_form_status}')
         print(f'line_align_status: {self.line_align_status}')
         print(f'size_status: {self.size_status}')
-        print(f'orientation_status: {self.orientation_status}')
+        # print(f'orientation_status: {self.orientation_status}')
 
     def print_vals(self):
         print(f'letter_form: {self.letter_form}')
-        print(f'orientation: {self.orientation}')
+        # print(f'orientation: {self.orientation}')
         print(f'size: {self.size}')
         print(f'line_align: {self.line_align}')
-
-    # def format_grades(self):
-    #     self.letter_g = self.letter_form * 100
-    #     self.size_g   = 
 
 class Boxman():
     # x,y,w,h format
@@ -116,6 +112,15 @@ class Boxman():
             #         [4,5,124,99], [127,5,127,100], [252,5,129,100], [381,5,129,100], [510,5,129,100], [640,5,129,100],
             #         [5,104,122,101], [127,104,124,101], [254,104,125,101], [382,104,126,101], [512,104,126,101], [641,104,126,101],
             #     ]
+            case "u_to_z":
+                coords = [
+                    [0, 0,   123, 96], [126, 6,   128, 96], [254, 6,   123, 94], [382, 6,   125, 93],  [513, 6,   125, 93], [643, 6,   125, 93],
+                    [3, 104, 121, 97], [127, 105, 122, 96], [253, 104, 125, 97], [382, 102, 125, 100], [513, 103, 125, 98], [643, 103, 125, 98],
+                    [5, 205, 118, 96], [129, 205, 119, 96], [255, 206, 122, 94], [384, 206, 123, 94],  [514, 204, 123, 94], [643, 206, 124, 94],
+                    [6, 304, 117, 95], [129, 305, 119, 95], [255, 305, 123, 95], [384, 307, 123, 94],  [513, 305, 123, 94], [643, 305, 124, 94],
+                    [5, 406, 117, 135], [129, 404, 117, 135], [256, 406, 117, 135], [386, 408, 117, 135], [517, 407, 117, 135], [644, 406, 120, 135],
+                    [5, 605, 118, 93], [130, 606, 118, 93], [255, 605, 118, 93], [385, 605, 118, 93], [514, 605, 121, 93], [644, 604, 122, 93],
+                ]
             case _:
                 print("Cannot initialize coords")
                 coords = []

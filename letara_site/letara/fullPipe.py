@@ -443,7 +443,7 @@ def percentage_diff(n1, n2):
 
 # Final evaluation following the criteria
 def eval_char_final(letter: Letter, template_letter: Letter, grade='k'):
-    letter.size_g = 100 - percentage_diff(letter.size, template_letter.size)
+    letter.size_g       = 100 - percentage_diff(letter.size, template_letter.size)
     letter.line_align_g = 100 - percentage_diff(letter.line_align, template_letter.line_align)
     # MAX_SKEW = 45 # max acceptable skew of a character
     # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
@@ -591,7 +591,14 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-    homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
+    # homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
+
+    homography, _ = cv.findHomography(
+        dst_pts, src_pts, 
+        cv.USAC_MAGSAC,  # Modern, robust algorithm
+        ransacReprojThreshold=5.0,
+        maxIters=5000
+    )
     if homography is None:
         raise ValueError("❌ Could not compute homography.")
 
