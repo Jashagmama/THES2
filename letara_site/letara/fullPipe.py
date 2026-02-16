@@ -31,14 +31,33 @@ model_path = (
         / "handwriting_MNIST.keras"
 )
 
+model_path_lc = (
+    Path(settings.BASE_DIR)
+        / "letara"
+        / "model"
+        / "hwv1.keras"
+)
+
 # model_path = 'letara'
 loaded_model = load_model(model_path)
+loaded_model_lcuc = load_model(model_path_lc)
 # loaded_model.load_weights("./model/handwriting_MNIST.keras")
 
 word_dict = {
     0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G',7:'H',8:'I',9:'J',10:'K',11:'L',12:'M',13:'N',14:'O',
     15:'P',16:'Q',17:'R',18:'S',19:'T',20:'U',21:'V',22:'W',23:'X', 24:'Y',25:'Z'
 }
+
+def box_lut(char_set: str) -> str:
+    match char_set:
+        case "efghijkl":
+            return "e_to_l"
+        case "mnopqrst":
+            return "m_to_t"
+        case "uvwxyz":
+            return "u_to_z"
+        case _:
+            return "all_caps"
 
 def plot_imgs(imgs: list, n_row, n_col, file_name=''):
     # plt.close('all')  # Close any existing figures FIRST
@@ -94,11 +113,60 @@ def template_char_check(img: MatLike):
     
     if len(img.shape) == 3:
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+    pre_iso = preproc_char_iso(img)
+    # show_img(img, 'img @ template_check')
+    # invert colors
+    img = cv.bitwise_not(pre_iso)
     
-    img = cv.bitwise_not(img)
-    # img = clahe_binarization(img)
+    if len(img.shape) == 3:
+        height, width, _ = img.shape
+    else:
+        height, width = img.shape
+    
+    true_x = width
+    true_y = height
+    true_x2 = 0
+    true_y2 = 0
+    
+    contours = cv.findContours(img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    contours = contours[0] if len(contours) == 2 else contours[1]
+    x,y,w,h = 0,0,0,0
+    for cntr in contours:
+        x,y,w,h = cv.boundingRect(cntr)
         
-    img = cv.resize(img, (28, 28))
+        if cv.contourArea(cntr) < 300:
+            continue
+        # cv.rectangle(img, (x, y), (x+w, y+h), (255, 255, 255), 5)
+
+        
+        true_x = min(true_x, x)
+        true_y = min(true_y, y)
+
+        true_x2 = max(true_x2, x + w)
+        true_y2 = max(true_y2, y + h)
+        # cv.rectangle(dup, (x, y), (x+w, y+h), (255, 255, 255), 10)
+
+        print(f'contourArea: {cv.contourArea(cntr)}')
+        # print("x,y,w,h:",x,y,w,h)
+    # current threshold for small letters is @ true_h <= 60
+    # dup = img.copy()
+    true_w = true_x2 - true_x
+    true_h = true_y2 - true_y
+    bottom = height - true_y2 # distance from bottom
+    top = height - true_y
+    # print(f'len contours: {len(contours)}')
+    # cv.rectangle(dup, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 5)
+    # show_img(dup, 'img @ char_check')
+    # print("x,y,w,h:",true_x,true_y,true_w,true_h)
+    # print(f"returns {true_h}, {bottom}")
+
+    cropped_to_bbox = img[y:y+h, x:x+w]
+    pad = 10
+    cropped = cv.copyMakeBorder(cropped_to_bbox, pad, pad, pad, pad, 
+                            cv.BORDER_CONSTANT, value=0)
+    print(f'true_h: {true_h}')
+    img = cv.resize(cropped, (28, 28))
     img = img.astype('float32') / 255.0
     
     # Add channel dimension (if model expects 1 channel)
@@ -106,13 +174,13 @@ def template_char_check(img: MatLike):
     
     # Add batch dimension
     img_predict = np.expand_dims(img_predict, axis=0)   # shape: (1, 30, 30, 1)
-    
-    prediction = loaded_model.predict(img_predict)
-    print(prediction)
-    print(f'size: {prediction.shape[1]}')
-    
-    
-    return img, word_dict[np.argmax(prediction)]
+
+    if true_h > 60:
+        prediction = loaded_model.predict(img_predict)       
+        return img, word_dict[np.argmax(prediction)]
+    else:
+        prediction = loaded_model_lcuc.predict(img_predict)  
+        return img, word_dict[np.argmax(prediction)].lower()
     # modify this such that if there is already an implementation 
 
 '''
@@ -183,9 +251,13 @@ def check_page(img: MatLike):
     # COL2_RANGE = 11
     coords = Boxman(mode='check').cells
     # coords = fullPipe.box_man.Boxman().cells[:2]
-    print(f'coords{len(coords)}: {coords[0]} {coords[1]}')
+    # print(f'coords{len(coords)}: {coords[0]} {coords[1]}')
     # show_img(img, 'check page img')
     #add list of character ranges for each page to return the correct file path or whatever representation
+    max_hits = 0
+    prob_set = ""
+    initial_char_lc = False
+
     char_set = ["ABCDEFGHIJ",
                 "KLMNOPQRST",
                 "UVWXYZabcd",   # probably gonna have to change lowercase depending on how the model handles it
@@ -193,28 +265,41 @@ def check_page(img: MatLike):
                 "mnopqrst",
                 "uvwxyz",
                 ]
-    # check first two columns for the characters
+
 
     # first_chars = []
     print(f'check_page len coords: {len(coords)}')
-
-    max_hits = 0
-    prob_set = ""
     
-    img_list = []
+    first_chars = []
+
     for chars in char_set:
-        # first_chars = []
+        match chars:
+            case "efghijkl":
+                coords = Boxman("check_e_to_l").cells
+            case "mnopqrst":
+                coords = Boxman("check_m_to_t").cells
+            case "uvwxyz":
+                coords = Boxman("check_u_to_z").cells
+        first_chars = []
+        img_list = []
         curr_set = chars
         hits = 0
+        print(f'chars: {chars}')
         for i in range(0, len(chars)):
+            print(f'len(chars): {len(chars)}  |  len(coords): {len(coords)}')
             template_char = img[coords[i].y:coords[i].y+coords[i].h,coords[i].x:coords[i].x+coords[i].w]
             char_img, template_txt = template_char_check(template_char)
-            if template_txt == chars[i]:
+            if initial_char_lc:
+                template_txt = template_txt.lower()
+            if template_txt.lower() == chars[i].lower():
                 hits += 1
             img_list.append(char_img)
-            # first_chars.append(template_txt)
-            # max_hits = max(hits, max_hits)
+            first_chars.append(template_txt)
+            if template_txt.islower():
+                initial_char_lc = True
             if (hits > max_hits):
+                print(f'max_hits: {max_hits} | set: {prob_set}')
+                max_hits = hits
                 prob_set = curr_set
                 
     # debugging purposes
@@ -234,12 +319,15 @@ def check_page(img: MatLike):
     #         print(f"Char set found: {chars}")
     #         return chars
     # print("Char set not found")
+    first_chars = ''.join(first_chars)
+    print(f'first_chars: {first_chars}')
     print(f'prob_set: {prob_set}')
     return prob_set
 
 
-def init_boxes() -> Boxman:
-    boxes = Boxman(mode='all_caps')
+def init_boxes(mode='all_caps') -> Boxman:
+    print(f'selected mode: {mode}')
+    boxes = Boxman(mode)
     # boxes.print_all()
     return boxes
 
@@ -370,11 +458,28 @@ def eval_orientation(img):
 
 # function returns confidence value for the expected letter and predicted letter of the model
 def eval_letter_form(img, expected_char):
-    full_char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    # full_char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    full_char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    fcs_lc = "abcdefghijklmnopqrstuvwxyz"
+    print(f'expected char: {expected_char}')
     char_idx = full_char_set.find(expected_char)
-    prediction = loaded_model.predict(img)
+    if char_idx == -1:
+        char_idx = fcs_lc.find(expected_char)
+    
+    prediction1 = loaded_model.predict(img)
+    # if (char_idx == -1):
+    prediction2 = loaded_model_lcuc.predict(img)
+    print(f'prediction1: {word_dict[np.argmax(prediction1)]} \t | prediction2: {word_dict[np.argmax(prediction2)]}')
+    print(f'cond {word_dict[np.argmax(prediction1)].lower()} == {word_dict[char_idx].lower()}')
+    if word_dict[np.argmax(prediction1)].lower() == word_dict[char_idx].lower():
+        print('matched prediction1')
+        prediction = prediction1
+    else:
+        prediction = prediction2
+
     print(f"predicted char: {word_dict[np.argmax(prediction)]}; actual char: {word_dict[char_idx]}")
-    print(f"conf_predicted: {prediction[0][np.argmax(prediction)]}; actual_conf: {prediction[0][char_idx]}")
+    # print(f"predicted char: {word_dict[np.argmax(prediction)]}; actual char: {word_dict[char_idx]}")
+    print(f"conf_predicted: {prediction[0][np.argmax(prediction)]:.2f}; actual_conf: {prediction[0][char_idx]:.2f}")
 
     return prediction[0][char_idx], word_dict[np.argmax(prediction)]
 
@@ -385,13 +490,13 @@ def eval_size_align(img):
         height, width, _ = img.shape
     else:
         height, width = img.shape
-
+    dup = img.copy()
     true_x = width
     true_y = height
     true_x2 = 0
     true_y2 = 0
     # img = cv.bitwise_not(img) 
- 
+    
     # img = cv.threshold(img,128,255,cv.THRESH_BINARY_INV)[1]
     
     # Convert to 8-bit grayscale if needed
@@ -403,21 +508,20 @@ def eval_size_align(img):
     if len(img.shape) == 3:
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     # thresh = cv.threshold(img,128,255,cv.THRESH_BINARY)[1]
-
+    
+    
     contours = cv.findContours(img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     contours = contours[0] if len(contours) == 2 else contours[1]
     for cntr in contours:
         x,y,w,h = cv.boundingRect(cntr)
-
-        if cv.contourArea(cntr) < 200: # skips the contour found if its area is smaller than 200
+        if cv.contourArea(cntr) < 200:
             continue
-
         true_x = min(true_x, x)
         true_y = min(true_y, y)
 
         true_x2 = max(true_x2, x + w)
         true_y2 = max(true_y2, y + h)
-        # cv.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+        # cv.rectangle(dup, (x, y), (x+w, y+h), (255, 255, 255), 10)
 
         print(f'contourArea: {cv.contourArea(cntr)}')
         # print("x,y,w,h:",x,y,w,h)
@@ -426,20 +530,23 @@ def eval_size_align(img):
     bottom = height - true_y2 # distance from bottom
     top = height - true_y
     print(f'len contours: {len(contours)}')
-    # cv.rectangle(img, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 1)
+    # cv.rectangle(dup, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 10)
     print("x,y,w,h:",true_x,true_y,true_w,true_h)
     print(f"returns {true_h}, {bottom}")
-    # returns size, align
-    '''
-    size  -> refers to the written character's height
-    align -> alignment based on the bottom part of the letter to the grid
-    '''
-    return true_h, bottom
 
-def percentage_diff(n1, n2):
-    if n1 == 0 or n2  == 0 or (n1 + n2 == 0): # a temporary fix need to fix bounding box generation for letters to remove this
+    cropped_to_bbox = img[true_y:true_y+true_h, true_x:true_x+true_w]
+    pad = 10
+    cropped = cv.copyMakeBorder(cropped_to_bbox, pad, pad, pad, pad, 
+                            cv.BORDER_CONSTANT, value=0)
+    # show_img(dup, 'size')
+    # returns size, align
+    return true_h, bottom, cropped
+
+def percentage_diff(n1, n2, eps=1e-8):
+    denom = abs(n1 + n2) / 2
+    if denom < eps:
         return 0
-    return abs(n1-n2)/(abs(n1+n2)/2) * 100
+    return abs(n1 - n2) / denom * 100
 
 # Final evaluation following the criteria
 def eval_char_final(letter: Letter, template_letter: Letter, grade='k'):
@@ -595,7 +702,7 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
     homography, _ = cv.findHomography(
         dst_pts, src_pts, 
-        cv.USAC_MAGSAC,  # Modern, robust algorithm
+        cv.USAC_MAGSAC,  
         ransacReprojThreshold=5.0,
         maxIters=5000
     )
@@ -736,27 +843,6 @@ def remove_colored_lines(img_bgr: MatLike, output_path: str="done.png",
     print(f"✅ Red lines removed -> {output_path}")
     return gray
 
-# Character isolation
-def isolate_chars(img: MatLike, boxes):
-    num_row = 10
-    num_col = 6
-    imgs = []
-    for i in range (0, num_row):
-        for j in range(0, num_col):
-            chr_isolated = img[boxes[i * num_col + j].y:boxes[i*num_col+j].y+boxes[i*num_col+j].h,boxes[i*num_col+j].x:boxes[i*num_col+j].x+boxes[i*num_col+j].w]
-            if j == 0:    
-                chr_isolated, _ = preproc_char(chr_isolated)
-            else:
-                chr_isolated, _ = preproc_char(chr_isolated, type='hw')
-            imgs.append(chr_isolated)
-                
-    # for box in boxes:
-    #     chr_isolated = img[box.y:box.y+box.h,box.x:box.x+box.w]
-    #     chr_isolated = preproc_char
-    #     imgs.append(chr_isolated)
-
-    # plot_imgs(imgs, num_row, num_col)
-
 
 # ---------------------------- #
 # Step 6: Extract Valid Letter Boxes
@@ -793,7 +879,7 @@ def remove_grid(img: MatLike) -> MatLike:
 def eval_letters(img: MatLike, box, char_set):
     boxes = box.cells
     num_col = 6
-    num_row = 10
+    num_row = len(char_set)
     unprocessed_imgs = []
     orientation_fixed = []
     eval_preproc = []
@@ -812,11 +898,10 @@ def eval_letters(img: MatLike, box, char_set):
                 new_letter = Letter(exp_char, boxes[i*num_col+j], is_template=False)
             orientation_angle, fixed_orientation_img = eval_orientation(chr_isolated)
             
-            
             # Invert color then resize to 28x28
             chr_isolated = cv.bitwise_not(chr_isolated_whitebg)
-            new_letter.size, new_letter.line_align = eval_size_align(chr_isolated)
-            chr_isolated = resize_cr(chr_isolated)
+            new_letter.size, new_letter.line_align, new_letter_img = eval_size_align(chr_isolated)
+            chr_isolated = resize_cr(new_letter_img)
             char_pred = img_format(chr_isolated)
             orientation_fixed.append(fixed_orientation_img)
   

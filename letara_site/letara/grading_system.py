@@ -76,7 +76,7 @@ def grade_handwriting_by_letter(image_path):
     #         / "model"
     #         / "handwriting_MNIST.keras"
     # )
-    NUM_ROW = 10
+    num_row = 10
     NUM_COL = 6
 
     template_img = cv.imread(os.path.join(settings.STATICFILES_DIRS[0], "ws_template", "A-J.png"))
@@ -96,7 +96,7 @@ def grade_handwriting_by_letter(image_path):
     shadow_removed = remove_shadow(sift_aligned)
     cv.imwrite("removed_shadow.png", shadow_removed)
 
-    num_enclosed = count_rect(shadow_removed) # don't need this anymore
+    # num_enclosed = count_rect(shadow_removed) # don't need this anymore
 
     print("\n--- Perspective Correction ---")
     perspective_corrected = correct_perspective(shadow_removed, "3_corrTab.png")
@@ -115,6 +115,7 @@ def grade_handwriting_by_letter(image_path):
 # add thresholding here before passing to eval_letters
     char_set = check_page(image_processed)
     print(f"chars: {char_set}")
+    boxes = Boxman(box_lut(char_set))
 
     print("\n--- Eval Letters ---")
     eval_letters(image_processed, boxes, char_set) 
@@ -127,9 +128,10 @@ def grade_handwriting_by_letter(image_path):
 
     # Grade each instance
     letter_instances = []
+    num_row = len(char_set)
     # position = 1
     print(f'==========grading_system_debug==========')
-    for i in range(NUM_ROW):
+    for i in range(num_row):
         for j in range(NUM_COL):
             curr_idx = i*NUM_COL+j
             if j == 0 or boxes.letters[curr_idx].size <= 0:  # character is a template or cell is empty
@@ -149,7 +151,7 @@ def grade_handwriting_by_letter(image_path):
     # Calculate worksheet summary
     worksheet_summary = calculate_worksheet_summary(letter_summaries, letter_instances)
     
-    dump_letters(boxes)
+    dump_letters(boxes, num_row)
 
     return {
         'letter_instances': letter_instances,
@@ -497,10 +499,10 @@ def default_worksheet_summary():
     }
 
 # Debugging purposes
-def dump_letters(boxes):
+def dump_letters(boxes, unique_letters):
     print(len(boxes.letters))
     written_acc = 0
-    ROW_CNT = 10
+    ROW_CNT = unique_letters
     COL_CNT = 6
     for i in range(ROW_CNT):
         for j in range(COL_CNT):
