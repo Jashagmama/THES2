@@ -542,93 +542,73 @@ def percentage_diff(n1, n2, eps=1e-8):
     return abs(n1 - n2) / denom * 100
 
 # base 60 Transmutation table used by deped
-def transmute_grade(score: float) -> int:
-    score = round(score, 2)
-    if score >= 100:
+def transmute_grade(initial_grade):
+    """
+    Transmute an initial grade to a transmuted grade based on the conversion table.
+    
+    Args:
+        initial_grade (float): The initial grade (0-100)
+    
+    Returns:
+        float: The transmuted grade (60-100)
+    """
+    # Grade conversion table: (min_initial, max_initial, transmuted)
+    grade_table = [
+        (100, 100, 100),
+        (98.40, 99.99, 99),
+        (96.80, 98.39, 98),
+        (95.20, 96.79, 97),
+        (93.60, 95.19, 96),
+        (92.00, 93.59, 95),
+        (90.40, 91.99, 94),
+        (88.80, 90.39, 93),
+        (87.20, 88.79, 92),
+        (85.60, 87.19, 91),
+        (84.00, 85.59, 90),
+        (82.40, 83.99, 89),
+        (80.80, 82.39, 88),
+        (79.20, 80.79, 87),
+        (77.60, 79.19, 86),
+        (76.00, 77.59, 85),
+        (74.40, 75.99, 84),
+        (72.80, 74.39, 83),
+        (71.20, 72.79, 82),
+        (69.60, 71.19, 81),
+        (68.00, 69.59, 80),
+        (66.40, 67.99, 79),
+        (64.80, 66.39, 78),
+        (63.20, 64.79, 77),
+        (61.60, 63.19, 76),
+        (60.00, 61.59, 75),
+        (56.00, 59.99, 74),
+        (52.00, 55.99, 73),
+        (48.00, 51.99, 72),
+        (44.00, 47.99, 71),
+        (40.00, 43.99, 70),
+        (36.00, 39.99, 69),
+        (32.00, 35.99, 68),
+        (28.00, 31.99, 67),
+        (24.00, 27.99, 66),
+        (20.00, 23.99, 65),
+        (16.00, 19.99, 64),
+        (12.00, 15.99, 63),
+        (8.00, 11.99, 62),
+        (4.00, 7.99, 61),
+        (0, 3.99, 60),
+    ]
+    
+    # Find the appropriate transmuted grade
+    for min_grade, max_grade, transmuted in grade_table:
+        if min_grade <= initial_grade <= max_grade:
+            return transmuted
+    
+    # Handle edge cases
+    if initial_grade > 100:
         return 100
-    elif 98.40 <= score < 100:
-        return 99
-    elif 96.80 <= score <= 98.39:
-        return 98
-    elif 95.20 <= score <= 96.79:
-        return 97
-    elif 93.60 <= score <= 95.19:
-        return 96
-    elif 92.00 <= score <= 93.59:
-        return 95
-    elif 90.40 <= score <= 91.99:
-        return 94
-    elif 88.80 <= score <= 90.39:
-        return 93
-    elif 87.20 <= score <= 88.79:
-        return 92
-    elif 85.60 <= score <= 87.19:
-        return 91
-    elif 84.00 <= score <= 85.59:
-        return 90
-    elif 82.40 <= score <= 83.99:
-        return 89
-    elif 80.80 <= score <= 82.39:
-        return 88
-    elif 79.20 <= score <= 80.79:
-        return 87
-    elif 77.60 <= score <= 79.19:
-        return 86
-    elif 76.00 <= score <= 77.59:
-        return 85
-    elif 74.40 <= score <= 75.99:
-        return 84
-    elif 72.80 <= score <= 74.39:
-        return 83
-    elif 71.20 <= score <= 72.79:
-        return 82
-    elif 69.60 <= score <= 71.19:
-        return 81
-    elif 68.00 <= score <= 69.59:
-        return 80
-    elif 66.40 <= score <= 67.99:
-        return 79
-    elif 64.80 <= score <= 66.39:
-        return 78
-    elif 63.20 <= score <= 64.79:
-        return 77
-    elif 61.60 <= score <= 63.19:
-        return 76
-    elif 60.00 <= score <= 61.59:
-        return 75
-    elif 56.00 <= score <= 59.99:
-        return 74
-    elif 52.00 <= score <= 55.99:
-        return 73
-    elif 48.00 <= score <= 51.99:
-        return 72
-    elif 44.00 <= score <= 47.99:
-        return 71
-    elif 40.00 <= score <= 43.99:
-        return 70
-    elif 36.00 <= score <= 39.99:
-        return 69
-    elif 32.00 <= score <= 35.99:
-        return 68
-    elif 28.00 <= score <= 31.99:
-        return 67
-    elif 24.00 <= score <= 27.99:
-        return 66
-    elif 20.00 <= score <= 23.99:
-        return 65
-    elif 16.00 <= score <= 19.99:
-        return 64
-    elif 12.00 <= score <= 15.99:
-        return 63
-    elif 8.00 <= score <= 11.99:
-        return 62
-    elif 4.00 <= score <= 7.99:
-        return 61
-    elif 0.00 <= score <= 3.99:
+    elif initial_grade < 0:
         return 60
-    else:
-        print(f'score: {score}')
-        raise ValueError("Score must be between 0 and 100.")
+    
+    return None
 
 # Final evaluation following the criteria
 def eval_char_final(letter: Letter, template_letter: Letter):
