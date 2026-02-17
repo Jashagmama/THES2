@@ -10,8 +10,11 @@ from PIL import Image
 from numpy._core.numeric import full
 from tensorflow import size
 
-import fullPipe
-import box_man
+from box_man import Boxman, Box, Letter
+from report import Report
+from report_genv3 import WorksheetValidator
+
+from fullPipe import *
 
 def grade_handwriting_by_letter(image_path):
     """
@@ -87,42 +90,42 @@ def grade_handwriting_by_letter(image_path):
     assert ws_img is not None, "Image is not found"
 
     # init box coords
-    boxes = fullPipe.init_boxes()
+    boxes = init_boxes()
     # if ws_img is None:
     #     raise ValueError("Could not load image")
     print("\n--- SIFT Alignment ---")
-    sift_aligned = fullPipe.align_documents_sift(template_img, ws_img, "2_sift.png")
+    sift_aligned = align_documents_sift(template_img, ws_img, "2_sift.png")
 
     print("\n--- Shadow Removal ---")
-    shadow_removed = fullPipe.remove_shadow(sift_aligned)
+    shadow_removed = remove_shadow(sift_aligned)
     cv.imwrite("removed_shadow.png", shadow_removed)
 
     # num_enclosed = count_rect(shadow_removed) # don't need this anymore
 
     print("\n--- Perspective Correction ---")
-    perspective_corrected = fullPipe.correct_perspective(shadow_removed, "3_corrTab.png")
+    perspective_corrected = correct_perspective(shadow_removed, "3_corrTab.png")
 
 
 
-    grid_removed = fullPipe.remove_grid(perspective_corrected)
+    grid_removed = remove_grid(perspective_corrected)
     print("\n--- Remove Red Lines ---")
-    result2, mask2 = fullPipe.detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
-    inpainted2_telea, _ = fullPipe.white_mask_then_inpaint(grid_removed, mask2, dilate_iterations=2, inpaint_radius=3, method='telea')
+    result2, mask2 = detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
+    inpainted2_telea, _ = white_mask_then_inpaint(grid_removed, mask2, dilate_iterations=2, inpaint_radius=3, method='telea')
     image_processed = inpainted2_telea
     cv.imwrite("./red_removed.png", image_processed)
 # image_processed = fullPipe.remove_colored_lines(grid_removed, "4_no_red.png")
 # image_processed = 
 
 # add thresholding here before passing to eval_letters
-    char_set = fullPipe.check_page(image_processed)
+    char_set = check_page(image_processed)
     print(f"chars: {char_set}")
-    boxes = box_man.Boxman(fullPipe.box_lut(char_set))
+    boxes = Boxman(box_lut(char_set))
 
     print("\n--- Eval Letters ---")
-    fullPipe.eval_letters(image_processed, boxes, char_set) 
+    eval_letters(image_processed, boxes, char_set) 
 
     img_out = perspective_corrected.copy()
-    res_img = fullPipe.create_result(img_out, boxes.letters)
+    res_img = create_result(img_out, boxes.letters)
 
     # remove this update the code to parse the new template 
     # all_letters = detect_all_letter_instances(img)
@@ -220,7 +223,7 @@ def detect_all_letter_instances(img):
     return all_letters
 
 
-def letter_to_data(letter: box_man.Letter, repetition_num):
+def letter_to_data(letter: Letter, repetition_num):
     """
     Grade a single letter instance
     
@@ -241,14 +244,14 @@ def letter_to_data(letter: box_man.Letter, repetition_num):
     # comments = f"{letter_char} rep {repetition_num}: " + generate_instance_feedback(
     #     letter_form, size, alignment, orientation
     # )
-    letter_form = letter.letter_form * 100
+    letter_form = transmute_grade(letter.letter_g)
     print(f'char: {letter.char} \t | form: {letter.letter_form: .2f} \t | form * 100: {letter_form: .2f}')
     return {
         'letter': letter.char,
         'repetition_num': repetition_num,
         'letter_form': letter_form,
-        'size': letter.size_g,
-        'line_align': letter.line_align_g,
+        'size': transmute_grade(letter.size_g),
+        'line_align': transmute_grade(letter.line_align_g),
         # 'orientation': letter.orientation
     }
     
@@ -618,4 +621,41 @@ def grade_single_letter(letter_img, letter_char, letter_number, bbox):
     }
 
 if __name__ == "__main__":
-    grade_handwriting_by_letter("../worksheets/e-l_01.jpg")
+    from pathlib import Path
+    # folder_path = "./Correct Check/"
+    excel_path = "./VotingPage.xlsx"
+    base_path = Path("./test/")
+    reports = []
+
+    word_dict = {
+        'kinder':(40, 60, 50),
+        'grade1':(60, 80, 70),
+        'grade2':(80, 90, 95),
+    }
+
+    for folder in sorted(base_path.iterdir()):
+
+        if folder.is_dir():
+            curr_report = Report(folder.name)
+
+            images = sorted(folder.glob("*.jpg")) + sorted(folder.glob("*.JPG"))
+            print(f"{folder.name}: {len(images)} images")
+            # grade_handwriting_by_letter(images)
+            
+            for img in images:
+                print(f"image:  {img.name}")
+                new_rep = grade_handwriting_by_letter(img)
+                curr_report.append_report(new_rep)
+
+            reports.append(curr_report)
+
+    validator = WorksheetValidator(excel_path)
+
+    reports_df = []
+    for report in reports:
+        form, line_align, size = word_dict[report.grade_lvl]
+        thresh = (form + line_align + size) / 3
+        report_df = validator.generate_validation_report({int(report.ws_num): report.letter_summary['letter_instances']})
+        reports_df.append(report_df)
+
+

@@ -169,7 +169,7 @@ def preproc_char_iso(img: MatLike, type=''):
 
     # dilate expects white fg and black bg
     if type.strip() == 'hw':
-        kernel = np.ones((8, 8), np.uint8)
+        kernel = np.ones((4, 4), np.uint8)
         img = cv.dilate(img, kernel, iterations=1)
     
     img = cv.bitwise_not(img)

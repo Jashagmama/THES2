@@ -294,6 +294,9 @@ def check_page(img: MatLike):
                 print(f'max_hits: {max_hits} | set: {prob_set}')
                 max_hits = hits
                 prob_set = curr_set
+
+        print(f'chars: first_chars')
+        print(f'{chars}: {first_chars}')
                 
     # debugging purposes
     # for i in range (0, len(coords)): # iterate only till 2nd row
@@ -764,7 +767,7 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-    homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
+    # homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
 
     # homography, _ = cv.findHomography(
     #     dst_pts, src_pts, 
@@ -773,7 +776,7 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     #     maxIters=5000
     # )
 
-    homography, mask = cv.findHomography(
+    homography, _ = cv.findHomography(
         dst_pts, src_pts, 
         cv.RANSAC, 
         5.0

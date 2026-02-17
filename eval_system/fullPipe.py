@@ -3,15 +3,14 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-import box_man
+from box_man import Boxman, Letter
 
-from math import ceil
+from math import ceil, floor
 from jdeskew.estimator import get_angle
 from jdeskew.utility import rotate
 from skimage.filters import threshold_sauvola
 
 from pathlib import Path
-
 
 # Typings
 from numpy.typing import NDArray
@@ -24,11 +23,11 @@ from keras.models import load_model
 tf.config.set_visible_devices([], 'GPU')
 
 model_path = (
-    "../model/handwriting_MNIST.keras"
+    "../letara_site/letara/model/handwriting_MNIST.keras"
 )
 
 model_path_lc = (
-    "../model/hwv1.keras"
+    "../letara_site/letara/model/hwv1.keras"
 )
 
 # model_path = 'letara'
@@ -146,27 +145,20 @@ def template_char_check(img: MatLike):
     # dup = img.copy()
     true_w = true_x2 - true_x
     true_h = true_y2 - true_y
-    bottom = height - true_y2 # distance from bottom
-    top = height - true_y
     # print(f'len contours: {len(contours)}')
     # cv.rectangle(dup, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 5)
     # show_img(dup, 'img @ char_check')
     # print("x,y,w,h:",true_x,true_y,true_w,true_h)
     # print(f"returns {true_h}, {bottom}")
 
-    cropped_to_bbox = img[y:y+h, x:x+w]
+    cropped_to_bbox = img[true_y:true_y+true_h, true_x:true_x+true_w]
     pad = 10
     cropped = cv.copyMakeBorder(cropped_to_bbox, pad, pad, pad, pad, 
                             cv.BORDER_CONSTANT, value=0)
     print(f'true_h: {true_h}')
     img = cv.resize(cropped, (28, 28))
-    img = img.astype('float32') / 255.0
-    
-    # Add channel dimension (if model expects 1 channel)
-    img_predict = np.expand_dims(img, axis=-1)  # shape: (30, 30, 1)
-    
-    # Add batch dimension
-    img_predict = np.expand_dims(img_predict, axis=0)   # shape: (1, 30, 30, 1)
+
+    img_predict = img_format(img)
 
     if true_h > 60:
         prediction = loaded_model.predict(img_predict)       
@@ -242,7 +234,7 @@ def white_mask_then_inpaint(image, mask, dilate_iterations=2, inpaint_radius=5, 
 def check_page(img: MatLike):
     # ROW_SIZE = 6
     # COL2_RANGE = 11
-    coords = box_man.Boxman(mode='check').cells
+    coords = Boxman(mode='check').cells
     # coords = fullPipe.box_man.Boxman().cells[:2]
     # print(f'coords{len(coords)}: {coords[0]} {coords[1]}')
     # show_img(img, 'check page img')
@@ -294,6 +286,9 @@ def check_page(img: MatLike):
                 print(f'max_hits: {max_hits} | set: {prob_set}')
                 max_hits = hits
                 prob_set = curr_set
+
+        print(f'chars: first_chars')
+        print(f'{chars}: {first_chars}')
                 
     # debugging purposes
     # for i in range (0, len(coords)): # iterate only till 2nd row
@@ -318,9 +313,9 @@ def check_page(img: MatLike):
     return prob_set
 
 
-def init_boxes(mode='all_caps') -> box_man.Boxman:
+def init_boxes(mode='all_caps') -> Boxman:
     print(f'selected mode: {mode}')
-    boxes = box_man.Boxman(mode)
+    boxes = Boxman(mode)
     # boxes.print_all()
     return boxes
 
@@ -346,7 +341,7 @@ def preproc_char_iso(img: MatLike, type=''):
 
     # dilate expects white fg and black bg
     if type.strip() == 'hw':
-        kernel = np.ones((12, 12), np.uint8)
+        kernel = np.ones((8, 8), np.uint8)
         img = cv.dilate(img, kernel, iterations=1)
         
         kernel = np.ones((3, 3), np.uint8)
@@ -541,10 +536,83 @@ def percentage_diff(n1, n2, eps=1e-8):
         return 0
     return abs(n1 - n2) / denom * 100
 
+# base 60 Transmutation table used by deped
+def transmute_grade(initial_grade):
+    """
+    Transmute an initial grade to a transmuted grade based on the conversion table.
+    
+    Args:
+        initial_grade (float): The initial grade (0-100)
+    
+    Returns:
+        float: The transmuted grade (60-100)
+    """
+    initial_grade = round(initial_grade, 2)
+    # Grade conversion table: (min_initial, max_initial, transmuted)
+    grade_table = [
+        (100, 100, 100),
+        (98.40, 99.99, 99),
+        (96.80, 98.39, 98),
+        (95.20, 96.79, 97),
+        (93.60, 95.19, 96),
+        (92.00, 93.59, 95),
+        (90.40, 91.99, 94),
+        (88.80, 90.39, 93),
+        (87.20, 88.79, 92),
+        (85.60, 87.19, 91),
+        (84.00, 85.59, 90),
+        (82.40, 83.99, 89),
+        (80.80, 82.39, 88),
+        (79.20, 80.79, 87),
+        (77.60, 79.19, 86),
+        (76.00, 77.59, 85),
+        (74.40, 75.99, 84),
+        (72.80, 74.39, 83),
+        (71.20, 72.79, 82),
+        (69.60, 71.19, 81),
+        (68.00, 69.59, 80),
+        (66.40, 67.99, 79),
+        (64.80, 66.39, 78),
+        (63.20, 64.79, 77),
+        (61.60, 63.19, 76),
+        (60.00, 61.59, 75),
+        (56.00, 59.99, 74),
+        (52.00, 55.99, 73),
+        (48.00, 51.99, 72),
+        (44.00, 47.99, 71),
+        (40.00, 43.99, 70),
+        (36.00, 39.99, 69),
+        (32.00, 35.99, 68),
+        (28.00, 31.99, 67),
+        (24.00, 27.99, 66),
+        (20.00, 23.99, 65),
+        (16.00, 19.99, 64),
+        (12.00, 15.99, 63),
+        (8.00, 11.99, 62),
+        (4.00, 7.99, 61),
+        (0, 3.99, 60),
+    ]
+    
+    # Find the appropriate transmuted grade
+    for min_grade, max_grade, transmuted in grade_table:
+        if min_grade <= initial_grade <= max_grade:
+            return transmuted
+    
+    # Handle edge cases
+    if initial_grade > 100:
+        return 100
+    elif initial_grade < 0:
+        return 60
+    
+    return None
+
 # Final evaluation following the criteria
-def eval_char_final(letter: box_man.Letter, template_letter: box_man.Letter, grade='k'):
+def eval_char_final(letter: Letter, template_letter: Letter):
+    # Transmutation table
+    letter.letter_g     = (letter.letter_form * 100)
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
     letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
+
     # MAX_SKEW = 45 # max acceptable skew of a character
     # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
     # match grade.strip().lower():
@@ -693,11 +761,17 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
     # homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
 
+    # homography, _ = cv.findHomography(
+    #     dst_pts, src_pts, 
+    #     cv.USAC_MAGSAC,  
+    #     ransacReprojThreshold=3.0,
+    #     maxIters=5000
+    # )
+
     homography, _ = cv.findHomography(
         dst_pts, src_pts, 
-        cv.USAC_MAGSAC,  
-        ransacReprojThreshold=5.0,
-        maxIters=5000
+        cv.RANSAC, 
+        5.0
     )
     if homography is None:
         raise ValueError("❌ Could not compute homography.")

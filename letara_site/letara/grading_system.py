@@ -292,9 +292,9 @@ def calculate_letter_summaries(letter_instances):
             continue
         
         for i in instances:
-            print(f'letter_form: {i['letter_form']}')
-            print(f'size: {i['size']}')
-            print(f'line_align: {i['line_align']}')
+            print(f"letter_form: {i['letter_form']}")
+            print(f"size: {i['size']}")
+            print(f"line_align: {i['line_align']}")
             # print(f'orientation: {i['orientation']}')
 
 
