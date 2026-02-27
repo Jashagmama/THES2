@@ -20,6 +20,7 @@ class Letter:
         self.orientation = 0.0    # skew of letter
         self.size = 0           # height of letter?
         self.line_align = 0     # y coordinate of the lower part of letter
+        self.line_align_g = 0
         self.char = char
         self.box = box
         self.letter_form_status = False

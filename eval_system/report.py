@@ -23,21 +23,30 @@ class Report:
 
     def append_report(self, new_rep: dict):
         if not self.letter_summary:
-            # First image - just assign directly
             self.letter_summary = new_rep
             return
 
-        # letter_instances: extend the list
         if 'letter_instances' in new_rep:
-            self.letter_summary['letter_instances'].extend(new_rep['letter_instances'])
+            existing = self.letter_summary['letter_instances']
 
-        # letter_summaries: extend the list
+            # Build a lookup of existing (letter, repetition_num) pairs
+            existing_keys = {
+                (inst['letter'], inst['repetition_num'])
+                for inst in existing
+            }
+
+            # Only add instances that don't already exist
+            for inst in new_rep['letter_instances']:
+                key = (inst['letter'], inst['repetition_num'])
+                if key not in existing_keys:
+                    existing.append(inst)
+                    existing_keys.add(key)
+
         if 'letter_summaries' in new_rep:
             self.letter_summary['letter_summaries'].extend(new_rep['letter_summaries'])
 
-        # worksheet_summary: overwrite with latest (or you could average them)
-        # if 'worksheet_summary' in new_rep:
-        #     self.letter_summary['worksheet_summary'] = new_rep['worksheet_summary']
+        if 'worksheet_summary' in new_rep:
+            self.letter_summary['worksheet_summary'] = new_rep['worksheet_summary']
 
     def generate_report(self):
         print("Generating report")

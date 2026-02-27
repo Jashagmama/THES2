@@ -20,7 +20,7 @@ from cv2.typing import MatLike
 from keras.models import load_model
 
 # Temporary set tensorflow to use cpu only
-tf.config.set_visible_devices([], 'GPU')
+# tf.config.set_visible_devices([], 'GPU')
 
 model_path = (
     "../letara_site/letara/model/handwriting_MNIST.keras"
@@ -139,7 +139,7 @@ def template_char_check(img: MatLike):
         true_y2 = max(true_y2, y + h)
         # cv.rectangle(dup, (x, y), (x+w, y+h), (255, 255, 255), 10)
 
-        print(f'contourArea: {cv.contourArea(cntr)}')
+        # print(f'contourArea: {cv.contourArea(cntr)}')
         # print("x,y,w,h:",x,y,w,h)
     # current threshold for small letters is @ true_h <= 60
     # dup = img.copy()
@@ -155,7 +155,7 @@ def template_char_check(img: MatLike):
     pad = 10
     cropped = cv.copyMakeBorder(cropped_to_bbox, pad, pad, pad, pad, 
                             cv.BORDER_CONSTANT, value=0)
-    print(f'true_h: {true_h}')
+    # print(f'true_h: {true_h}')
     img = cv.resize(cropped, (28, 28))
 
     img_predict = img_format(img)
@@ -341,7 +341,7 @@ def preproc_char_iso(img: MatLike, type=''):
 
     # dilate expects white fg and black bg
     if type.strip() == 'hw':
-        kernel = np.ones((8, 8), np.uint8)
+        kernel = np.ones((9, 9), np.uint8)
         img = cv.dilate(img, kernel, iterations=1)
         
         kernel = np.ones((3, 3), np.uint8)
@@ -520,7 +520,7 @@ def eval_size_align(img):
     print(f'len contours: {len(contours)}')
     # cv.rectangle(dup, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 10)
     print("x,y,w,h:",true_x,true_y,true_w,true_h)
-    print(f"returns {true_h}, {bottom}")
+    # print(f"returns {true_h}, {bottom}")
 
     cropped_to_bbox = img[true_y:true_y+true_h, true_x:true_x+true_w]
     pad = 10
@@ -995,7 +995,7 @@ def create_result(img: MatLike, letters, out_path: str = ""):
     result = img
     for letter in letters:
         # letter.print_coords()
-        print(f"isPass: {letter.isPass()}")
+        # print(f"isPass: {letter.isPass()}")
         box = letter.box
         x = box.x
         y = box.y

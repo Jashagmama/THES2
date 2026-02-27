@@ -1,7 +1,7 @@
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
-import tensorflow as tf
+# import tensorflow as tf
 
 from .box_man import *
 
@@ -22,7 +22,7 @@ from cv2.typing import MatLike
 from keras.models import load_model
 
 # Temporary set tensorflow to use cpu only
-tf.config.set_visible_devices([], 'GPU')
+# tf.config.set_visible_devices([], 'GPU')
 
 model_path = (
     Path(settings.BASE_DIR)
@@ -349,7 +349,7 @@ def preproc_char_iso(img: MatLike, type=''):
 
     # dilate expects white fg and black bg
     if type.strip() == 'hw':
-        kernel = np.ones((12, 12), np.uint8)
+        kernel = np.ones((9, 9), np.uint8)
         img = cv.dilate(img, kernel, iterations=1)
         
         kernel = np.ones((3, 3), np.uint8)
@@ -524,7 +524,7 @@ def eval_size_align(img):
     true_w = true_x2 - true_x
     true_h = true_y2 - true_y
     bottom = height - true_y2 # distance from bottom
-    top = height - true_y
+    # top = height - true_y
     print(f'len contours: {len(contours)}')
     # cv.rectangle(dup, (true_x, true_y), (true_x+true_w, true_y+true_h), (255, 255, 255), 10)
     print("x,y,w,h:",true_x,true_y,true_w,true_h)
@@ -620,6 +620,7 @@ def eval_char_final(letter: Letter, template_letter: Letter):
     letter.letter_g     = (letter.letter_form * 100)
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
     letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
+    # letter.line_align_g = 100
 
     # MAX_SKEW = 45 # max acceptable skew of a character
     # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
@@ -956,7 +957,6 @@ def eval_letters(img: MatLike, box, char_set):
     num_col = 6
     num_row = len(char_set)
     unprocessed_imgs = []
-    orientation_fixed = []
     eval_preproc = []
     imgs = []
     for i in range (0, num_row):
@@ -971,24 +971,24 @@ def eval_letters(img: MatLike, box, char_set):
             else:
                 chr_isolated_whitebg = preproc_char_iso(chr_isolated, type='hw') # dilate image
                 new_letter = Letter(exp_char, boxes[i*num_col+j], is_template=False)
-            orientation_angle, fixed_orientation_img = eval_orientation(chr_isolated)
+            # orientation_angle, fixed_orientation_img = eval_orientation(chr_isolated)
             
             # Invert color then resize to 28x28
             chr_isolated = cv.bitwise_not(chr_isolated_whitebg)
+            show_img(chr_isolated, 'chr_iso')
             new_letter.size, new_letter.line_align, new_letter_img = eval_size_align(chr_isolated)
             chr_isolated = resize_cr(new_letter_img)
             char_pred = img_format(chr_isolated)
-            orientation_fixed.append(fixed_orientation_img)
   
             conf_lvl, _ = eval_letter_form(char_pred, exp_char)
             new_letter.letter_form = conf_lvl 
-            new_letter.orientation = orientation_angle
             char_conf_lvl = char_conf_lvl + conf_lvl
             eval_preproc.append(chr_isolated)
             if j != 0:
                 eval_char_final(new_letter, box.letters[i * num_col]) # evaluate non template character here
+            new_letter.print_vals()
             box.letters.append(new_letter)
-        print(f'{exp_char} conf level avg = {char_conf_lvl / 6}')
+        # print(f'{exp_char} conf level avg = {char_conf_lvl / 6}')
     # for box in boxes:
     #     chr_isolated = img[box.y:box.y+box.h,box.x:box.x+box.w]
     #     chr_isolated = preproc_char
@@ -996,6 +996,7 @@ def eval_letters(img: MatLike, box, char_set):
 
     # plot_imgs(imgs, num_row, num_col)
     # plot_imgs(orientation_fixed, num_row, num_col)
+    print(f"num_row: {num_row}  |   num_col: {num_col}")
     plot_imgs(eval_preproc, num_row, num_col, file_name='imgs')
 
     # expects warped fix image or 3_corrTab.png
@@ -1003,7 +1004,7 @@ def create_result(img: MatLike, letters, out_path: str = ""):
     result = img
     for letter in letters:
         # letter.print_coords()
-        print(f"isPass: {letter.isPass()}")
+        # print(f"isPass: {letter.isPass()}")
         box = letter.box
         x = box.x
         y = box.y
@@ -1012,13 +1013,13 @@ def create_result(img: MatLike, letters, out_path: str = ""):
         if letter.is_template:
             # print("Cont..")
             continue
-        if letter.isPass() and not letter.is_template:
-            print("Letter passed")
+        # if letter.isPass() and not letter.is_template:
+        #     print("Letter passed")
 
             # print(f"x:{x}, y:{y}, w:{w}, h:{h}") 
-            cv.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 15)
-        else:
-            cv.rectangle(result, (x, y), (x+w, y+h), (255, 0, 0), 15)
+            # cv.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 15)
+        # else:
+        #     cv.rectangle(result, (x, y), (x+w, y+h), (255, 0, 0), 15)
     return result
 
 
@@ -1063,7 +1064,7 @@ if __name__ == "__main__":
         print("\n--- Eval Letters ---")
         eval_letters(image_processed, boxes, char_set) 
 
-        res_img = create_result(perspective_corrected, boxes.letters)
+        # res_img = create_result(perspective_corrected, boxes.letters)
     except Exception as e:
         print(f"❌ Pipeline failed: {e}")
 # isolate_chars(image_processed, boxes.cells)

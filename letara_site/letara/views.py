@@ -262,7 +262,6 @@ def auto_grade_worksheet(request, pk):
             total_letters=ws_data['total_letters'],
             total_repetitions=ws_data['total_repetitions'],
             grading_method=ws_data['grading_method'],
-            graded_by=ws_data['graded_by'],
             comments=ws_data['comments'],
             strengths=ws_data['strengths'],
             areas_for_improvement=ws_data['areas_for_improvement']

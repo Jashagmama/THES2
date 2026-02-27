@@ -12,7 +12,7 @@ from tensorflow import size
 
 from box_man import Boxman, Box, Letter
 from report import Report
-from report_genv3 import WorksheetValidator
+from report_gen_check import WorksheetValidator
 
 from fullPipe import *
 
@@ -134,7 +134,7 @@ def grade_handwriting_by_letter(image_path):
     letter_instances = []
     num_row = len(char_set)
     # position = 1
-    print(f'==========grading_system_debug==========')
+    # print(f'==========grading_system_debug==========')
     for i in range(num_row):
         for j in range(NUM_COL):
             curr_idx = i*NUM_COL+j
@@ -155,7 +155,7 @@ def grade_handwriting_by_letter(image_path):
     # Calculate worksheet summary
     worksheet_summary = calculate_worksheet_summary(letter_summaries, letter_instances)
     
-    dump_letters(boxes, num_row)
+    # dump_letters(boxes, num_row)
 
     return {
         'letter_instances': letter_instances,
@@ -245,7 +245,7 @@ def letter_to_data(letter: Letter, repetition_num):
     #     letter_form, size, alignment, orientation
     # )
     letter_form = transmute_grade(letter.letter_g)
-    print(f'char: {letter.char} \t | form: {letter.letter_form: .2f} \t | form * 100: {letter_form: .2f}')
+    # print(f'char: {letter.char} \t | form: {letter.letter_form: .2f} \t | form * 100: {letter_form: .2f}')
     return {
         'letter': letter.char,
         'repetition_num': repetition_num,
@@ -295,10 +295,10 @@ def calculate_letter_summaries(letter_instances):
         if not instances:
             continue
         
-        for i in instances:
-            print(f'letter_form: {i['letter_form']}')
-            print(f'size: {i['size']}')
-            print(f'line_align: {i['line_align']}')
+        # for i in instances:
+            # print(f'letter_form: {i['letter_form']}')
+            # print(f'size: {i['size']}')
+            # print(f'line_align: {i['line_align']}')
             # print(f'orientation: {i['orientation']}')
 
 
@@ -624,7 +624,7 @@ if __name__ == "__main__":
     from pathlib import Path
     # folder_path = "./Correct Check/"
     excel_path = "./VotingPage.xlsx"
-    base_path = Path("./test/")
+    base_path = Path("./No Check partial/")
     reports = []
 
     word_dict = {
@@ -652,10 +652,33 @@ if __name__ == "__main__":
     validator = WorksheetValidator(excel_path)
 
     reports_df = []
+
+    indiv_dfs = []
+    avg_dfs = []
+
+
     for report in reports:
         form, line_align, size = word_dict[report.grade_lvl]
         thresh = (form + line_align + size) / 3
-        report_df = validator.generate_validation_report({int(report.ws_num): report.letter_summary['letter_instances']})
-        reports_df.append(report_df)
+        report_df = validator.generate_validation_report({int(report.ws_num): report.letter_summary['letter_instances']}, thresh)
+        indiv_df = validator.generate_individual_repetitions(report.letter_summary['letter_instances'])
+        avg_df = validator.generate_letter_averages(report.letter_summary['letter_instances'])
+        indiv_df.to_excel("indiv_" + report.folder_name + ".xlsx", index=False)
+        avg_df.to_excel("avg_" + report.folder_name + ".xlsx", index=False)
+        # reports_df.append(report_df)
+        # indiv_dfs.append(indiv_df)
+        # avg_dfs.append(indiv_df)
 
 
+# import pandas as pd
+#
+# # Create a sample DataFrame
+# data = {'Column 1': [1, 2, 3, 4],
+#         'Column 2': ['A', 'B', 'C', 'D']}
+# df = pd.DataFrame(data)
+#
+# # Export the DataFrame to an Excel file
+# file_name = 'output.xlsx'
+# df.to_excel(file_name, index=False) # Set index=False to exclude row numbers
+#
+# print(f"DataFrame successfully written to {file_name}")
