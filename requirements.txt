@@ -1,1 +1,4 @@
 tensorflow
+opencv-python
+matplotlib
+pandas

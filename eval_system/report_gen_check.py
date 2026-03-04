@@ -31,10 +31,11 @@ class ConfusionMetrics:
 
 
 class WorksheetValidator:
-    def __init__(self, excel_path: str):
+    def __init__(self, excel_path: str, mode = 'simple'):
         self.excel_path = excel_path
-        self.home_df    = pd.read_excel(excel_path, sheet_name='Home')
-        self.home_df.columns = self.home_df.columns.str.strip()
+        if not mode.strip().lower() == 'simple':
+            self.home_df    = pd.read_excel(excel_path, sheet_name='Home')
+            self.home_df.columns = self.home_df.columns.str.strip()
 
         self.cap_rep_cols = ['Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5']
         self.sml_rep_cols = ['Unnamed: 10', 'Unnamed: 11', 'Unnamed: 12', 'Unnamed: 13', 'Unnamed: 14']
@@ -170,10 +171,10 @@ class WorksheetValidator:
                 print(f"  {'-'*45}")
         print()
 
-    def print_all_voting_results(self):
-        """Print voting results for all worksheets."""
-        for ws_num in self.home_df['Worksheet'].dropna().astype(int):
-            self.print_voting_results(ws_num)
+    # def print_all_voting_results(self):
+    #     """Print voting results for all worksheets."""
+    #     for ws_num in self.home_df['Worksheet'].dropna().astype(int):
+    #         self.print_voting_results(ws_num)
 
     # ------------------------------------------------------------------ #
     #  Public: ground truth                                                #
@@ -198,20 +199,12 @@ class WorksheetValidator:
         letter_instances: List[Dict],
         threshold_score: float = 75.0
     ) -> List[ConfusionMetrics]:
-        """
-        Cross-reference AI letter_instances against voter ground truth.
-        Operates at repetition level (each of 5 reps is a TP/TN/FP/FN).
-        A repetition is AI-predicted incorrect if avg score < threshold_score.
-
-        Only letters present in letter_instances are evaluated -
-        letters with no AI score are excluded rather than counted as FN.
-        """
         ground_truth = self.get_ground_truth(worksheet_num)
 
         # Build AI predictions and track which letters were actually scored.
-        # ai_predictions : { 'A': [1, 3] }  - only reps below threshold
+        # cnn_predictions : { 'A': [1, 3] }  - only reps below threshold
         # ai_scored_letters: { 'A', 'B', ... } - all letters AI produced a score for
-        ai_predictions: Dict[str, List[int]] = {}
+        cnn_predictions: Dict[str, List[int]] = {}
         ai_scored_letters: set = set()
 
         for inst in letter_instances:
@@ -226,7 +219,7 @@ class WorksheetValidator:
             ai_scored_letters.add(letter)  # mark as scored regardless of result
 
             if avg < threshold_score:
-                ai_predictions.setdefault(letter, []).append(rep_num)
+                cnn_predictions.setdefault(letter, []).append(rep_num)
 
         # Only evaluate letters the AI actually scored -
         # avoids false FNs for letters with no AI data
@@ -236,7 +229,7 @@ class WorksheetValidator:
         metrics_list = []
         for letter in sorted(all_letters):
             gt_incorrect = set(ground_truth.get(letter, []))
-            ai_incorrect = set(ai_predictions.get(letter, []))
+            ai_incorrect = set(cnn_predictions.get(letter, []))
             is_capital   = letter.isupper()
 
             metric = ConfusionMetrics(
@@ -273,21 +266,21 @@ class WorksheetValidator:
                 letter = inst['letter']
                 rep_count[letter] = rep_count.get(letter, 0) + 1
 
-            for m in self.calculate_confusion_matrix(ws_num, letter_instances, threshold_score):
-                rows.append({
-                    'Worksheet':         m.worksheet_num,
-                    'Letter':            m.letter,
-                    'Case':              'Capital' if m.is_capital else 'Small',
-                    'Repetitions Found': rep_count.get(m.letter, 0),
-                    'TP':                m.true_positives,
-                    'TN':                m.true_negatives,
-                    'FP':                m.false_positives,
-                    'FN':                m.false_negatives,
-                    'Accuracy':          round(m.accuracy(),  4),
-                    'Precision':         round(m.precision(), 4),
-                    'Recall':            round(m.recall(),    4),
-                    'F1':                round(m.f1_score(),  4),
-                })
+            # for m in self.calculate_confusion_matrix(ws_num, letter_instances, threshold_score):
+            #     rows.append({
+            #         'Worksheet':         m.worksheet_num,
+            #         'Letter':            m.letter,
+            #         'Case':              'Capital' if m.is_capital else 'Small',
+            #         'Repetitions Found': rep_count.get(m.letter, 0),
+            #         'TP':                m.true_positives,
+            #         'TN':                m.true_negatives,
+            #         'FP':                m.false_positives,
+            #         'FN':                m.false_negatives,
+            #         'Accuracy':          round(m.accuracy(),  4),
+            #         'Precision':         round(m.precision(), 4),
+            #         'Recall':            round(m.recall(),    4),
+            #         'F1':                round(m.f1_score(),  4),
+            #     })
         return pd.DataFrame(rows)
 
     def print_validation_report(
@@ -381,7 +374,6 @@ class WorksheetValidator:
 
             rows.append({
                 'Letter':      letter,
-                # 'Case':        'Capital' if letter.isupper() else 'Small',
                 'Avg Form':    avg_form,
                 'Avg Size':    avg_size,
                 'Avg Align':   avg_align,
@@ -470,7 +462,7 @@ class WorksheetValidator:
 #  Usage example                                                       #
 # ------------------------------------------------------------------ #
 if __name__ == '__main__':
-    validator = WorksheetValidator('Voting_Page___1_.xlsx')
+    validator = WorksheetValidator('Voting_Page___1_.xlsx', )
 
     # Print voting results only
     validator.print_voting_results(2)

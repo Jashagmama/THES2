@@ -355,9 +355,9 @@ def preproc_char_iso(img: MatLike, type=''):
     #     img = img[y:y+h, x:x+w]
     
     # Add padding
-    pad = 10
-    img = cv.copyMakeBorder(img, pad, pad, pad, pad, 
-                            cv.BORDER_CONSTANT, value=0)
+    # pad = 10
+    # img = cv.copyMakeBorder(img, pad, pad, pad, pad, 
+    #                         cv.BORDER_CONSTANT, value=0)
     
     # Resize to square
     # img = cv.resize(img, (28, 28))
@@ -536,6 +536,25 @@ def percentage_diff(n1, n2, eps=1e-8):
         return 0
     return abs(n1 - n2) / denom * 100
 
+def percent_error(n1, n2):
+    """
+   Computes percent error between numbers, this function will only be used in alignment grading
+
+   Parameters:
+   - n1: handwritten grid align
+   - n2: template bottom grid align
+    """
+    # if n1 < n2: # have to check this assumption if hw align is lower than tmemplate
+    #     return 100
+    # else:
+    if n1 == 0 and n2 == 0:
+        return 0
+    # Workaround in cases where template align is 0
+    elif n2 == 0:
+        n1 += 1
+        n2 += 1
+    return abs((n1 - n2) / n2) * 100
+
 # base 60 Transmutation table used by deped
 def transmute_grade(initial_grade):
     """
@@ -611,7 +630,7 @@ def eval_char_final(letter: Letter, template_letter: Letter):
     # Transmutation table
     letter.letter_g     = (letter.letter_form * 100)
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
-    letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
+    letter.line_align_g = abs(100 - percent_error(letter.line_align, template_letter.line_align))
 
     # MAX_SKEW = 45 # max acceptable skew of a character
     # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
@@ -706,24 +725,21 @@ def count_rect(img: MatLike) -> int:
     return len(squares)
 
 
-# ---------------------------- #
-# Step 1: Skew Correction
-# ---------------------------- #
-def correct_skew(image: MatLike, output_path: str) -> MatLike:
-    # image = cv.imread(input_image_path)
-    if image is None:
-        raise FileNotFoundError(f"❌ Could not load {input_image_path} for skew correction.")
-    angle = get_angle(image)
-    corrected = rotate(image, angle)
-    # cv.imwrite(output_path, corrected)
-
-    print(f"✅ Skew correction done -> {output_path}, angle: {angle}")
-
-    return image
+# def correct_skew(image: MatLike, output_path: str) -> MatLike:
+#     # image = cv.imread(input_image_path)
+#     if image is None:
+#         raise FileNotFoundError(f"❌ Could not load {input_image_path} for skew correction.")
+#     angle = get_angle(image)
+#     corrected = rotate(image, angle)
+#     # cv.imwrite(output_path, corrected)
+#
+#     print(f"✅ Skew correction done -> {output_path}, angle: {angle}")
+#
+#     return image
 
 
 # ---------------------------- #
-# Step 2: SIFT Alignment
+# Step 1: SIFT Alignment
 # ---------------------------- #
 def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, output_path: str) -> MatLike:
     # template_color = cv.imread(template_path)
@@ -784,7 +800,7 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
 
 # ---------------------------- #
-# Step 3: Perspective Correction
+# Step 2: Perspective Correction
 # ---------------------------- #
 # have to check the current image first for the existing letters or character set 
 def correct_perspective(image: MatLike, output_path: str="3_corrTab.png") -> MatLike:
@@ -877,7 +893,7 @@ def remove_shadow(img: MatLike) -> MatLike:
 
 
 # ---------------------------- #
-# Step 4: Remove Red Lines
+# Step 3: Remove Red Lines
 # ---------------------------- #
 
 
@@ -912,7 +928,7 @@ def remove_colored_lines(img_bgr: MatLike, output_path: str="done.png",
 
 
 # ---------------------------- #
-# Step 6: Extract Valid Letter Boxes
+# Step 4: Extract Valid Letter Boxes
 # ---------------------------- #
 
 def remove_grid(img: MatLike) -> MatLike:

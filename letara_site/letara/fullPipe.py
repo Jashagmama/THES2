@@ -363,10 +363,10 @@ def preproc_char_iso(img: MatLike, type=''):
     #     img = img[y:y+h, x:x+w]
     
     # Add padding
-    pad = 10
-    img = cv.copyMakeBorder(img, pad, pad, pad, pad, 
-                            cv.BORDER_CONSTANT, value=0)
-    
+    # pad = 10
+    # img = cv.copyMakeBorder(img, pad, pad, pad, pad, 
+    #                         cv.BORDER_CONSTANT, value=0)
+
     # Resize to square
     # img = cv.resize(img, (28, 28))
     
@@ -544,6 +544,25 @@ def percentage_diff(n1, n2, eps=1e-8):
         return 0
     return abs(n1 - n2) / denom * 100
 
+def percent_error(n1, n2):
+    """
+   Computes percent error between numbers, this function will only be used in alignment grading
+
+   Parameters:
+   - n1: handwritten grid align
+   - n2: template bottom grid align
+    """
+    # if n1 < n2: # have to check this assumption if hw align is lower than tmemplate
+    #     return 100
+    # else:
+    if n1 == 0 and n2 == 0:
+        return 0
+    # Workaround in cases where template align is 0
+    elif n2 == 0:
+        n1 += 1
+        n2 += 1
+    return abs((n1 - n2) / n2) * 100
+
 # base 60 Transmutation table used by deped
 def transmute_grade(initial_grade):
     """
@@ -619,7 +638,7 @@ def eval_char_final(letter: Letter, template_letter: Letter):
     # Transmutation table
     letter.letter_g     = (letter.letter_form * 100)
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
-    letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
+    letter.line_align_g = abs(100 - percent_error(letter.line_align, template_letter.line_align))
     # letter.line_align_g = 100
 
     # MAX_SKEW = 45 # max acceptable skew of a character
@@ -975,7 +994,6 @@ def eval_letters(img: MatLike, box, char_set):
             
             # Invert color then resize to 28x28
             chr_isolated = cv.bitwise_not(chr_isolated_whitebg)
-            show_img(chr_isolated, 'chr_iso')
             new_letter.size, new_letter.line_align, new_letter_img = eval_size_align(chr_isolated)
             chr_isolated = resize_cr(new_letter_img)
             char_pred = img_format(chr_isolated)

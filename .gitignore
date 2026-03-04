@@ -33,6 +33,9 @@ letara_site/letara/migrations/*
 eval_box.png
 final_res.png
 
+# eval test folder
+logistics_reg/
+
 # Backup files
 *.bak
 
