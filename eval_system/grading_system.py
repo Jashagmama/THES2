@@ -448,7 +448,7 @@ if __name__ == "__main__":
     from pathlib import Path
     # folder_path = "./Correct Check/"
     excel_path = "./VotingPage.xlsx"
-    base_path = Path("./Correct Check/")
+    base_path = Path("./No Check partial/")
     reports = []
 
     word_dict = {
@@ -456,6 +456,7 @@ if __name__ == "__main__":
         'grade1':(60, 80, 70),
         'grade2':(80, 90, 95),
     }
+    validator = WorksheetValidator(excel_path, mode='simple')
 
     for folder in sorted(base_path.iterdir()):
 
@@ -475,22 +476,29 @@ if __name__ == "__main__":
 
             reports.append(curr_report)
 
-    validator = WorksheetValidator(excel_path, mode='simple')
+            form, line_align, size = word_dict[curr_report.grade_lvl]
+            thresh = (form + line_align + size) / 3
+            report_df = validator.generate_validation_report({int(curr_report.ws_num): curr_report.letter_summary['letter_instances']}, thresh)
+            indiv_df = validator.generate_individual_repetitions(curr_report.letter_summary['letter_instances'])
+            avg_df = validator.generate_letter_averages(curr_report.letter_summary['letter_instances'])
+            indiv_df.to_excel("indiv_" + curr_report.folder_name + ".xlsx", index=False)
+            avg_df.to_excel("avg_" + curr_report.folder_name + ".xlsx", index=False)
 
-    reports_df = []
 
-    indiv_dfs = []
-    avg_dfs = []
-
-
-    for report in reports:
-        form, line_align, size = word_dict[report.grade_lvl]
-        thresh = (form + line_align + size) / 3
-        report_df = validator.generate_validation_report({int(report.ws_num): report.letter_summary['letter_instances']}, thresh)
-        indiv_df = validator.generate_individual_repetitions(report.letter_summary['letter_instances'])
-        avg_df = validator.generate_letter_averages(report.letter_summary['letter_instances'])
-        indiv_df.to_excel("indiv_" + report.folder_name + ".xlsx", index=False)
-        avg_df.to_excel("avg_" + report.folder_name + ".xlsx", index=False)
+    # reports_df = []
+    #
+    # indiv_dfs = []
+    # avg_dfs = []
+    #
+    #
+    # for report in reports:
+    #     form, line_align, size = word_dict[report.grade_lvl]
+    #     thresh = (form + line_align + size) / 3
+    #     report_df = validator.generate_validation_report({int(report.ws_num): report.letter_summary['letter_instances']}, thresh)
+    #     indiv_df = validator.generate_individual_repetitions(report.letter_summary['letter_instances'])
+    #     avg_df = validator.generate_letter_averages(report.letter_summary['letter_instances'])
+    #     indiv_df.to_excel("indiv_" + report.folder_name + ".xlsx", index=False)
+    #     avg_df.to_excel("avg_" + report.folder_name + ".xlsx", index=False)
         # reports_df.append(report_df)
         # indiv_dfs.append(indiv_df)
         # avg_dfs.append(indiv_df)
