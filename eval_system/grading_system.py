@@ -95,6 +95,8 @@ def grade_handwriting_by_letter(image_path):
     #     raise ValueError("Could not load image")
     print("\n--- SIFT Alignment ---")
     sift_aligned = align_documents_sift(template_img, ws_img, "2_sift.png")
+    if sift_aligned is None:
+        return 1
 
     print("\n--- Shadow Removal ---")
     shadow_removed = remove_shadow(sift_aligned)
@@ -122,6 +124,10 @@ def grade_handwriting_by_letter(image_path):
     boxes = Boxman(box_lut(char_set))
 
     print("\n--- Eval Letters ---")
+    num_row = len(char_set)
+    if num_row == 0:
+        return 1
+
     eval_letters(image_processed, boxes, char_set) 
 
     img_out = perspective_corrected.copy()
@@ -132,7 +138,6 @@ def grade_handwriting_by_letter(image_path):
 
     # Grade each instance
     letter_instances = []
-    num_row = len(char_set)
     # position = 1
     # print(f'==========grading_system_debug==========')
     for i in range(num_row):
@@ -154,6 +159,9 @@ def grade_handwriting_by_letter(image_path):
     
     # Calculate worksheet summary
     worksheet_summary = calculate_worksheet_summary(letter_summaries, letter_instances)
+
+    if worksheet_summary is None:
+        return None
     
     # dump_letters(boxes, num_row)
 
@@ -336,7 +344,7 @@ def calculate_letter_summaries(letter_instances):
 def calculate_worksheet_summary(letter_summaries, letter_instances):
     """Calculate overall worksheet summary"""
     if not letter_summaries:
-        return default_worksheet_summary()
+        return None
     
     # Average across all letters
     avg_form = sum(l['avg_letter_form'] for l in letter_summaries) / len(letter_summaries)
@@ -440,7 +448,7 @@ if __name__ == "__main__":
     from pathlib import Path
     # folder_path = "./Correct Check/"
     excel_path = "./VotingPage.xlsx"
-    base_path = Path("./No Check partial/")
+    base_path = Path("./Correct Check/")
     reports = []
 
     word_dict = {
@@ -454,13 +462,15 @@ if __name__ == "__main__":
         if folder.is_dir():
             curr_report = Report(folder.name)
 
-            images = sorted(folder.glob("*.jpg")) + sorted(folder.glob("*.JPG"))
+            images = sorted(folder.glob("*.jpg")) + sorted(folder.glob("*.JPG")) + sorted(folder.glob("*.png"))
             print(f"{folder.name}: {len(images)} images")
             # grade_handwriting_by_letter(images)
             
             for img in images:
                 print(f"image:  {img.name}")
                 new_rep = grade_handwriting_by_letter(img)
+                if new_rep is None or new_rep == 1:
+                    continue
                 curr_report.append_report(new_rep)
 
             reports.append(curr_report)

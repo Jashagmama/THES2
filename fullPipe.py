@@ -328,9 +328,11 @@ def eval_size_align(img):
     return true_h, bottom
 
 def percentage_diff(n1, n2):
-    if n1 == 0 or n2  == 0: # a temporary fix need to fix bounding box generation for letters to remove this
+    eps = 1e-8
+    denom = abs(n1 + n2) / 2
+    if denom < eps:
         return 0
-    return abs(n1-n2)/(abs(n1+n2)/2) * 100
+    return abs(n1 - n2) / denom * 100
 
 def eval_char_final(letter, template_letter, grade='K'):
     match grade.strip().lower():
@@ -383,28 +385,34 @@ def correct_skew(image: MatLike, output_path: str) -> MatLike:
 # ---------------------------- #
 # Step 2: SIFT Alignment
 # ---------------------------- #
-def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, output_path: str) -> MatLike:
-    # template_color = cv.imread(template_path)
-    # filled_doc_color = cv.imread(filled_doc_path)
-    # if template_color is None or filled_doc_color is None:
-    #     raise ValueError("❌ Could not load images. Check file paths.")
-    
+def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, output_path: str, runs: int = 5) -> MatLike:
+
+    # Convert to grayscale
     if len(filled_doc_color.shape) == 3:
         filled_doc_gray = cv.cvtColor(filled_doc_color, cv.COLOR_BGR2GRAY)
     else:
         filled_doc_gray = filled_doc_color.copy()
 
-    # if len(template_color.shape) == 3:
-    template_gray = cv.cvtColor(template_color, cv.COLOR_BGR2GRAY)
-    # else:
-    #     template_gray = template_color.copy()
+    if len(template_color.shape) == 3:
+        template_gray = cv.cvtColor(template_color, cv.COLOR_BGR2GRAY)
+    else:
+        template_gray = template_color.copy()
 
-    sift = cv.SIFT_create()
+    # Better SIFT params for document matching
+    sift = cv.SIFT_create(
+        nfeatures=5000,
+        contrastThreshold=0.02,
+        edgeThreshold=5
+    )
     kp1, desc1 = sift.detectAndCompute(template_gray, None)
     kp2, desc2 = sift.detectAndCompute(filled_doc_gray, None)
+
+    print(f"Template keypoints: {len(kp1)}, Scan keypoints: {len(kp2)}")
+
     if desc1 is None or desc2 is None:
         raise ValueError("❌ Could not find enough features in images.")
 
+    # FLANN matching
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
@@ -412,17 +420,55 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     matches = flann.knnMatch(desc1, desc2, k=2)
 
     good_matches = [m for m, n in matches if m.distance < 0.7 * n.distance]
+    print(f"Good matches: {len(good_matches)}")
+
     if len(good_matches) < 10:
-        raise ValueError("❌ Not enough good matches found for alignment.")
+        raise ValueError(f"❌ Not enough good matches: {len(good_matches)}")
 
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-    homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
-    if homography is None:
-        raise ValueError("❌ Could not compute homography.")
 
-    h, w, _ = template_color.shape
-    aligned_image = cv.warpPerspective(filled_doc_color, homography, (w, h))
+    best_H = None
+    best_inliers = 0
+
+    for i in range(1, runs + 1):
+        cv.setRNGSeed(i * 42)
+        H, mask = cv.findHomography(
+            src_pts, dst_pts,
+            cv.USAC_MAGSAC,
+            5.0,
+            confidence=0.999
+        )
+        if H is None:
+            print(f"Run {i}: H is None")
+            continue
+
+        inliers = mask.sum()
+        det = np.linalg.det(H)
+        # print(f"Run {i}: inliers={inliers}/{len(good_matches)}, det={det:.4f}")
+
+        if inliers > best_inliers and (0.1 < abs(det) < 10.0):
+            best_inliers = inliers
+            best_H = H
+
+    # ✅ Fix 1: Guard against None before warpPerspective
+    if best_H is None:
+        raise ValueError(f"❌ Homography failed across all {runs} runs. "
+                         f"Good matches: {len(good_matches)}, best inliers: {best_inliers}")
+
+    # ✅ Fix 2: Validate corners aren't wildly distorted
+    h, w = template_color.shape[:2]
+    corners = np.float32([[0,0],[w,0],[w,h],[0,h]]).reshape(-1,1,2)
+    transformed = cv.perspectiveTransform(corners, best_H)
+    area = cv.contourArea(transformed)
+    area_ratio = area / (w * h)
+    print(f"Area ratio: {area_ratio:.2f} (expect 0.3–3.0)")
+    if not (0.3 < area_ratio < 3.0):
+        raise ValueError(f"❌ Homography is degenerate (area ratio={area_ratio:.2f})")
+
+    # ✅ Fix 3: Use inv(H) — H maps template→scan, so invert to warp scan→template
+    aligned_image = cv.warpPerspective(filled_doc_color, np.linalg.inv(best_H), (w, h))
+
     cv.imwrite(output_path, aligned_image)
     show_img(aligned_image, 'aligned')
     print(f"✅ SIFT alignment done -> {output_path}")

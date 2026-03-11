@@ -9,6 +9,7 @@ from math import ceil, floor
 from jdeskew.estimator import get_angle
 from jdeskew.utility import rotate
 from skimage.filters import threshold_sauvola
+from time import perf_counter
 
 from pathlib import Path
 
@@ -536,25 +537,6 @@ def percentage_diff(n1, n2, eps=1e-8):
         return 0
     return abs(n1 - n2) / denom * 100
 
-def percent_error(n1, n2):
-    """
-   Computes percent error between numbers, this function will only be used in alignment grading
-
-   Parameters:
-   - n1: handwritten grid align
-   - n2: template bottom grid align
-    """
-    # if n1 < n2: # have to check this assumption if hw align is lower than tmemplate
-    #     return 100
-    # else:
-    if n1 == 0 and n2 == 0:
-        return 0
-    # Workaround in cases where template align is 0
-    elif n2 == 0:
-        n1 += 1
-        n2 += 1
-    return abs((n1 - n2) / n2) * 100
-
 # base 60 Transmutation table used by deped
 def transmute_grade(initial_grade):
     """
@@ -630,7 +612,7 @@ def eval_char_final(letter: Letter, template_letter: Letter):
     # Transmutation table
     letter.letter_g     = (letter.letter_form * 100)
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
-    letter.line_align_g = abs(100 - percent_error(letter.line_align, template_letter.line_align))
+    letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
 
     # MAX_SKEW = 45 # max acceptable skew of a character
     # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
@@ -741,28 +723,34 @@ def count_rect(img: MatLike) -> int:
 # ---------------------------- #
 # Step 1: SIFT Alignment
 # ---------------------------- #
-def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, output_path: str) -> MatLike:
-    # template_color = cv.imread(template_path)
-    # filled_doc_color = cv.imread(filled_doc_path)
-    # if template_color is None or filled_doc_color is None:
-    #     raise ValueError("❌ Could not load images. Check file paths.")
-    
+def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, output_path: str, runs: int = 5) -> MatLike:
+
+    # Convert to grayscale
     if len(filled_doc_color.shape) == 3:
         filled_doc_gray = cv.cvtColor(filled_doc_color, cv.COLOR_BGR2GRAY)
     else:
         filled_doc_gray = filled_doc_color.copy()
 
-    # if len(template_color.shape) == 3:
-    template_gray = cv.cvtColor(template_color, cv.COLOR_BGR2GRAY)
-    # else:
-    #     template_gray = template_color.copy()
+    if len(template_color.shape) == 3:
+        template_gray = cv.cvtColor(template_color, cv.COLOR_BGR2GRAY)
+    else:
+        template_gray = template_color.copy()
 
-    sift = cv.SIFT_create()
+    # Better SIFT params for document matching
+    sift = cv.SIFT_create(
+        nfeatures=5000,
+        contrastThreshold=0.02,
+        edgeThreshold=5
+    )
     kp1, desc1 = sift.detectAndCompute(template_gray, None)
     kp2, desc2 = sift.detectAndCompute(filled_doc_gray, None)
+
+    print(f"Template keypoints: {len(kp1)}, Scan keypoints: {len(kp2)}")
+
     if desc1 is None or desc2 is None:
         raise ValueError("❌ Could not find enough features in images.")
 
+    # FLANN matching
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
@@ -770,30 +758,54 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     matches = flann.knnMatch(desc1, desc2, k=2)
 
     good_matches = [m for m, n in matches if m.distance < 0.7 * n.distance]
+    print(f"Good matches: {len(good_matches)}")
+
     if len(good_matches) < 10:
-        raise ValueError("❌ Not enough good matches found for alignment.")
+        raise ValueError(f"❌ Not enough good matches: {len(good_matches)}")
 
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-    # homography, _ = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
 
-    # homography, _ = cv.findHomography(
-    #     dst_pts, src_pts, 
-    #     cv.USAC_MAGSAC,  
-    #     ransacReprojThreshold=3.0,
-    #     maxIters=5000
-    # )
+    best_H = None
+    best_inliers = 0
 
-    homography, _ = cv.findHomography(
-        dst_pts, src_pts, 
-        cv.RANSAC, 
-        5.0
-    )
-    if homography is None:
-        raise ValueError("❌ Could not compute homography.")
+    for i in range(1, runs + 1):
+        cv.setRNGSeed(i * 42)
+        H, mask = cv.findHomography(
+            src_pts, dst_pts,
+            cv.USAC_MAGSAC,
+            5.0,
+            confidence=0.999
+        )
+        if H is None:
+            print(f"Run {i}: H is None")
+            continue
 
-    h, w, _ = template_color.shape
-    aligned_image = cv.warpPerspective(filled_doc_color, homography, (w, h))
+        inliers = mask.sum()
+        det = np.linalg.det(H)
+        print(f"Run {i}: inliers={inliers}/{len(good_matches)}, det={det:.4f}")
+
+        if inliers > best_inliers and (0.1 < abs(det) < 10.0):
+            best_inliers = inliers
+            best_H = H
+
+    if best_H is None:
+        return None
+        raise ValueError(f"❌ Homography failed across all {runs} runs. "
+                         f"Good matches: {len(good_matches)}, best inliers: {best_inliers}")
+
+    h, w = template_color.shape[:2]
+    corners = np.float32([[0,0],[w,0],[w,h],[0,h]]).reshape(-1,1,2)
+    transformed = cv.perspectiveTransform(corners, best_H)
+    area = cv.contourArea(transformed)
+    area_ratio = area / (w * h)
+    print(f"Area ratio: {area_ratio:.2f} (expect 0.3–3.0)")
+    if not (0.3 < area_ratio < 3.0):
+        return None
+        # raise ValueError(f"❌ Homography is degenerate (area ratio={area_ratio:.2f})")
+
+    aligned_image = cv.warpPerspective(filled_doc_color, np.linalg.inv(best_H), (w, h))
+
     cv.imwrite(output_path, aligned_image)
     print(f"✅ SIFT alignment done -> {output_path}")
     return aligned_image
