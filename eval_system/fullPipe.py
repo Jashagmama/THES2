@@ -53,14 +53,14 @@ def box_lut(char_set: str) -> str:
             return "all_caps"
 
 def plot_imgs(imgs: list, n_row, n_col, file_name=''):
-    # plt.close('all')  # Close any existing figures FIRST
+    plt.close('all')  # Close any existing figures FIRST
     
     _, axs = plt.subplots(n_row, n_col, figsize=(12, 12))
     axs = axs.flatten()
     
     for img, ax in zip(imgs, axs):
         ax.imshow(img, cmap='gray')
-        ax.axis('off')  # Optional: hide axes for cleaner look
+        ax.axis('off')  # hide axes for cleaner look
     
     # Hide unused subplots
     for ax in axs[len(imgs):]:
@@ -70,7 +70,7 @@ def plot_imgs(imgs: list, n_row, n_col, file_name=''):
     if file_name.strip() != '': 
         plt.savefig(f'{file_name}.png', bbox_inches='tight')
     # plt.show()
-    # plt.close('all')
+    plt.close('all')
 
 
 def show_img(img: MatLike, title: str = '') -> None:
@@ -331,7 +331,7 @@ def preproc_char_iso(img: MatLike, type=''):
     
     # Sauvola thresholding
     window_size = 25
-    thresh_sauvola = threshold_sauvola(img, window_size=window_size, k=0.1) 
+    thresh_sauvola = threshold_sauvola(img, window_size=window_size, k=0.05) 
     img = img > thresh_sauvola
     
     # Convert boolean to uint8 (0 and 255)
@@ -736,7 +736,6 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     else:
         template_gray = template_color.copy()
 
-    # Better SIFT params for document matching
     sift = cv.SIFT_create(
         nfeatures=5000,
         contrastThreshold=0.02,
@@ -771,12 +770,14 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
     for i in range(1, runs + 1):
         cv.setRNGSeed(i * 42)
+
         H, mask = cv.findHomography(
             src_pts, dst_pts,
-            cv.USAC_MAGSAC,
-            5.0,
+            cv.RANSAC,
+            3.0,
             confidence=0.999
         )
+
         if H is None:
             print(f"Run {i}: H is None")
             continue
@@ -785,7 +786,8 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
         det = np.linalg.det(H)
         print(f"Run {i}: inliers={inliers}/{len(good_matches)}, det={det:.4f}")
 
-        if inliers > best_inliers and (0.1 < abs(det) < 10.0):
+        if inliers > best_inliers:
+        # and (0.1 < abs(det) < 10.0):
             best_inliers = inliers
             best_H = H
 
@@ -801,7 +803,8 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     area_ratio = area / (w * h)
     print(f"Area ratio: {area_ratio:.2f} (expect 0.3–3.0)")
     if not (0.3 < area_ratio < 3.0):
-        return None
+        # return None
+        print("Area ratio is degraded")
         # raise ValueError(f"❌ Homography is degenerate (area ratio={area_ratio:.2f})")
 
     aligned_image = cv.warpPerspective(filled_doc_color, np.linalg.inv(best_H), (w, h))

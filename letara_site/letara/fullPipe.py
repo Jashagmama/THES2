@@ -338,7 +338,7 @@ def preproc_char_iso(img: MatLike, type=''):
     
     # Sauvola thresholding
     window_size = 25
-    thresh_sauvola = threshold_sauvola(img, window_size=window_size, k=0.1) 
+    thresh_sauvola = threshold_sauvola(img, window_size=window_size, k=0.05) 
     img = img > thresh_sauvola
     
     # Convert boolean to uint8 (0 and 255)
@@ -784,8 +784,8 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
         cv.setRNGSeed(i * 42)
         H, mask = cv.findHomography(
             src_pts, dst_pts,
-            cv.USAC_MAGSAC,
-            5.0,
+            cv.RANSAC,
+            3.0,
             confidence=0.999
         )
         if H is None:
@@ -796,12 +796,13 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
         det = np.linalg.det(H)
         print(f"Run {i}: inliers={inliers}/{len(good_matches)}, det={det:.4f}")
 
-        if inliers > best_inliers and (0.1 < abs(det) < 10.0):
+        if inliers > best_inliers:
+            # and (0.1 < abs(det) < 10.0):
             best_inliers = inliers
             best_H = H
 
     if best_H is None:
-        raise ValueError(f"❌ Homography failed across all {runs} runs. "
+        raise ValueError(f"Homography failed across all {runs} runs. "
                          f"Good matches: {len(good_matches)}, best inliers: {best_inliers}")
 
     h, w = template_color.shape[:2]
@@ -811,7 +812,8 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
     area_ratio = area / (w * h)
     print(f"Area ratio: {area_ratio:.2f} (expect 0.3–3.0)")
     if not (0.3 < area_ratio < 3.0):
-        raise ValueError(f"❌ Homography is degenerate (area ratio={area_ratio:.2f})")
+        # raise ValueError(f"❌ Homography is degenerate (area ratio={area_ratio:.2f})")
+        print(f"❌ Homography is degenerate (area ratio={area_ratio:.2f})")
 
     aligned_image = cv.warpPerspective(filled_doc_color, np.linalg.inv(best_H), (w, h))
 

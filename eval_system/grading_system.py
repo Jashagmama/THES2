@@ -90,7 +90,6 @@ def grade_handwriting_by_letter(image_path):
     assert ws_img is not None, "Image is not found"
 
     # init box coords
-    boxes = init_boxes()
     # if ws_img is None:
     #     raise ValueError("Could not load image")
     print("\n--- SIFT Alignment ---")
@@ -448,7 +447,7 @@ if __name__ == "__main__":
     from pathlib import Path
     # folder_path = "./Correct Check/"
     excel_path = "./VotingPage.xlsx"
-    base_path = Path("./No Check partial/")
+    base_path = Path("./No Check/")
     reports = []
 
     word_dict = {
