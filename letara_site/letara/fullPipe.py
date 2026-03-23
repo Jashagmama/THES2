@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 from .box_man import *
 
 from math import ceil, floor
-from jdeskew.estimator import get_angle
-from jdeskew.utility import rotate
 from skimage.filters import threshold_sauvola
 from time import perf_counter
 
