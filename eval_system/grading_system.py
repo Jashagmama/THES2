@@ -447,7 +447,7 @@ if __name__ == "__main__":
     from pathlib import Path
     # folder_path = "./Correct Check/"
     excel_path = "./VotingPage.xlsx"
-    base_path = Path("./No Check/")
+    base_path = Path("./test/")
     reports = []
 
     word_dict = {

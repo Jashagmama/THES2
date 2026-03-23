@@ -435,8 +435,8 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
         cv.setRNGSeed(i * 42)
         H, mask = cv.findHomography(
             src_pts, dst_pts,
-            cv.USAC_MAGSAC,
-            5.0,
+            cv.RANSAC,
+            3.0,
             confidence=0.999
         )
         if H is None:
@@ -451,12 +451,10 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
             best_inliers = inliers
             best_H = H
 
-    # ✅ Fix 1: Guard against None before warpPerspective
-    if best_H is None or best_H < 1e-8:
+    if best_H is None:
         raise ValueError(f"❌ Homography failed across all {runs} runs. "
                          f"Good matches: {len(good_matches)}, best inliers: {best_inliers}")
 
-    # ✅ Fix 2: Validate corners aren't wildly distorted
     h, w = template_color.shape[:2]
     corners = np.float32([[0,0],[w,0],[w,h],[0,h]]).reshape(-1,1,2)
     transformed = cv.perspectiveTransform(corners, best_H)

@@ -251,11 +251,6 @@
             <a href="{{ document.get_display_image.url }}" download class="btn btn-success">
                 ⬇ Download Worksheet
             </a>
-            {% if document.is_graded %}
-                <a href="{% url 'grade_worksheet' pk=document.pk %}" class="btn btn-warning">
-                    ✏️ Edit Grade
-                </a>
-            {% endif %}
             <a href="/document/{{ document.pk }}/grade/" class="btn btn-primary">
                 🎯 Start Grading
             </a>

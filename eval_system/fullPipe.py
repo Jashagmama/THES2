@@ -786,8 +786,7 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
         det = np.linalg.det(H)
         print(f"Run {i}: inliers={inliers}/{len(good_matches)}, det={det:.4f}")
 
-        if inliers > best_inliers:
-        # and (0.1 < abs(det) < 10.0):
+        if inliers > best_inliers and (1e-5 < abs(det) < 10.0):
             best_inliers = inliers
             best_H = H
 
