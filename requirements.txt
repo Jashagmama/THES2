@@ -1,4 +1,19 @@
-tensorflow
-opencv-python
-matplotlib
+# Web Framework
+Django>=4.2
+
+# Machine Learning (Mac-specific TensorFlow)
+tensorflow-macos
+tensorflow-metal
+
+# Image Processing
+opencv-python-headless
+
+# Core Libraries
+numpy
 pandas
+matplotlib
+Pillow
+
+# Optional (useful for your thesis pipeline)
+scikit-image
+scikit-learn
