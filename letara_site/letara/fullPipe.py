@@ -1,5 +1,10 @@
 import numpy as np
 import cv2 as cv
+import matplotlib
+matplotlib.use("Agg")
+
+import numpy as np
+import cv2 as cv
 import matplotlib.pyplot as plt
 # import tensorflow as tf
 
@@ -17,29 +22,28 @@ from numpy.typing import NDArray
 from cv2.typing import MatLike
 
 # keras
-from keras.models import load_model
+from tensorflow.keras.models import load_model
+from pathlib import Path
+from django.conf import settings
 
-# Temporary set tensorflow to use cpu only
-# tf.config.set_visible_devices([], 'GPU')
+BASE_DIR = Path(settings.BASE_DIR)
+MODEL_DIR = BASE_DIR / "letara" / "model"
 
-model_path = (
-    Path(settings.BASE_DIR)
-        / "letara"
-        / "model"
-        / "handwriting_MNIST.keras"
-)
+MODEL_UPPER_PATH = MODEL_DIR / "handwriting_MNIST_patched.keras"
+MODEL_LC_PATH = MODEL_DIR / "hwv1_patched.keras"
 
-model_path_lc = (
-    Path(settings.BASE_DIR)
-        / "letara"
-        / "model"
-        / "hwv1.keras"
-)
+def safe_load_model(path: Path):
+    if not path.exists():
+        raise FileNotFoundError(f"Model file not found: {path}")
+    return load_model(path, compile=False)
 
-# model_path = 'letara'
-loaded_model = load_model(model_path)
-loaded_model_lcuc = load_model(model_path_lc)
-# loaded_model.load_weights("./model/handwriting_MNIST.keras")
+loaded_model = safe_load_model(MODEL_UPPER_PATH)
+loaded_model_lcuc = safe_load_model(MODEL_LC_PATH)
+
+if MODEL_LC_PATH.exists():
+    loaded_model_lcuc = safe_load_model(MODEL_LC_PATH)
+else:
+    loaded_model_lcuc = loaded_model
 
 word_dict = {
     0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G',7:'H',8:'I',9:'J',10:'K',11:'L',12:'M',13:'N',14:'O',
@@ -167,10 +171,10 @@ def template_char_check(img: MatLike):
     img_predict = img_format(img)
 
     if true_h > 60:
-        prediction = loaded_model.predict(img_predict)       
+        prediction = loaded_model.predict(img_predict, verbose=0)       
         return img, word_dict[np.argmax(prediction)]
     else:
-        prediction = loaded_model_lcuc.predict(img_predict)  
+        prediction = loaded_model_lcuc.predict(img_predict, verbose=0)  
         return img, word_dict[np.argmax(prediction)].lower()
     # modify this such that if there is already an implementation 
 
@@ -460,12 +464,12 @@ def eval_letter_form(img, expected_char):
     if char_idx == -1:
         char_idx = fcs_lc.find(expected_char)
     
-    prediction1 = loaded_model.predict(img)
+    prediction1 = loaded_model.predict(img, verbose=0)
     # if (char_idx == -1):
-    prediction2 = loaded_model_lcuc.predict(img)
+    prediction2 = loaded_model_lcuc.predict(img, verbose=0)
     print(f'prediction1: {word_dict[np.argmax(prediction1)]} \t | prediction2: {word_dict[np.argmax(prediction2)]}')
     print(f'cond {word_dict[np.argmax(prediction1)].lower()} == {word_dict[char_idx].lower()}')
-    if word_dict[np.argmax(prediction1)].lower() == word_dict[char_idx].lower():
+    if word_dict[np.argmax(prediction1)].lower() == {word_dict[char_idx].lower()}:
         print('matched prediction1')
         prediction = prediction1
     else:
@@ -1078,7 +1082,7 @@ if __name__ == "__main__":
 
         print("\n--- Perspective Correction ---")
         num_enclosed = count_rect(sift_aligned)
-        perspective_corrected = correct_perspective(sift_aligned, num_enclosed, "3_corrTab.png")
+        perspective_corrected = correct_perspective(sift_aligned, "3_corrTab.png")
         grid_removed = remove_grid(perspective_corrected)
 
         print("\n--- Remove Red Lines ---")
@@ -1111,4 +1115,3 @@ if __name__ == "__main__":
 # step5 = enhance_handwriting_final(cleaned_telea, "final_clean_strokes_white_on_black.png")
 
 # print("\n✅ Pipeline complete — final outputs in 'valid_letter_boxes/'.")
-
