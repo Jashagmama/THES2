@@ -1,4 +1,5 @@
-tensorflow
+Django
 opencv-python
 matplotlib
 pandas
+scikit-image

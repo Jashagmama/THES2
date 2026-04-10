@@ -6,9 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "Django",
-    "tensorflow",
     "opencv-python",
     "matplotlib",
     "pandas",
-    "Pillow"
+    "scikit-image"
 ]
