@@ -6,13 +6,10 @@ matplotlib.use("Agg")
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
-# import tensorflow as tf
 
 from .box_man import *
 
-from math import ceil, floor
 from skimage.filters import threshold_sauvola
-from time import perf_counter
 
 from pathlib import Path
 from django.conf import settings
