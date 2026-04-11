@@ -267,7 +267,7 @@ def auto_grade_worksheet(request, pk):
             areas_for_improvement=ws_data['areas_for_improvement']
         )
 
-        print(f"ws_data[total_repetitions]: {type(ws_data['total_repetitions'])}")
+        print(f'ws_data[total_repetitions]: {type(ws_data['total_repetitions'])}')
         
         return JsonResponse({
             'success': True,
