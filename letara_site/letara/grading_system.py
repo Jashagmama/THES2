@@ -119,12 +119,6 @@ def grade_handwriting_by_letter(image_path):
     print("\n--- Eval Letters ---")
     eval_letters(image_processed, boxes, char_set) 
 
-    img_out = perspective_corrected.copy()
-    res_img = create_result(img_out, boxes.letters)
-
-    # remove this update the code to parse the new template 
-    # all_letters = detect_all_letter_instances(img)
-
     # Grade each instance
     letter_instances = []
     num_row = len(char_set)

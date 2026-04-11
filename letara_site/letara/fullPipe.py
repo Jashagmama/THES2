@@ -432,27 +432,18 @@ def count_grid_cells(img) -> int:
     print(f"Number of grid cells detected: {cell_count}")
     return cell_count
 
-# Grading
-# accepts isolated char image with black fg and white bg
-# returns skewed corrected for grading
-def eval_orientation(img):
-    # WHITE = [255,255,255]
-    # PADDING = 0
-    # constant = cv.copyMakeBorder(img,PADDING,PADDING,PADDING,PADDING,cv.BORDER_CONSTANT,value=WHITE)
-    # img_hdup = cv.hconcat([img, img])
-    # imgs = []
-    # imgs.append(img)
-    angle = get_angle(img)
-    deskewed_img = rotate(img, angle, border_value=(255, 255, 255))
-    # border_value=(255, 255, 255)
-    # imgs.append(deskewed_img)
-    # plot_imgs(imgs,1,2)
-    print(f"angle: {angle}")
-    return angle, deskewed_img
-
 # function returns confidence value for the expected letter and predicted letter of the model
 def eval_letter_form(img, expected_char):
-    # full_char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    """
+    Evalutes a letter form using CNN trained model
+
+    Args:
+        img (MatLike):          Image to be evaluated
+        expected_char (String): expected letter for the image
+    
+    Returns:
+        returns confidence level, the letter determined by the model
+    """
     full_char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     fcs_lc = "abcdefghijklmnopqrstuvwxyz"
     print(f'expected char: {expected_char}')
@@ -479,7 +470,15 @@ def eval_letter_form(img, expected_char):
 
 # expects an inverted image black background white foreground
 def eval_size_align(img):
+    """
+    Evaluates size (height) and baseline alignment by using bounding box
     
+    Args:
+        img (MatLike): Image to be evaluated
+    
+    Returns:
+        return true_h: height, bottom: distance from bottom grid to bottom part of the letter, cropped: cropped image
+    """
     if len(img.shape) == 3:
         height, width, _ = img.shape
     else:
@@ -533,10 +532,20 @@ def eval_size_align(img):
     cropped = cv.copyMakeBorder(cropped_to_bbox, pad, pad, pad, pad, 
                             cv.BORDER_CONSTANT, value=0)
     # show_img(dup, 'size')
-    # returns size, align
     return true_h, bottom, cropped
 
 def percentage_diff(n1, n2, eps=1e-8):
+    """
+    Retruns percentage difference between to numbers
+
+    Args:
+        n1:  Number 1
+        n2:  Number 2
+        eps: A small number to manage floating point operations inaccuracy
+
+    Returns:
+        float: percentage difference
+    """
     denom = abs(n1 + n2) / 2
     if denom < eps:
         return 0
@@ -614,123 +623,29 @@ def transmute_grade(initial_grade):
 
 # Final evaluation following the criteria
 def eval_char_final(letter: Letter, template_letter: Letter):
-    # Transmutation table
+    """
+    Evaluates the grade for a handwritten letter
+
+    Args:
+        letter (Letter):          handwritten letter
+        template_letter (Letter): template letter for the assigned letter
+    """
     letter.letter_g     = (letter.letter_form * 100)
     letter.size_g       = abs(100 - percentage_diff(letter.size, template_letter.size))
     letter.line_align_g = abs(100 - percentage_diff(letter.line_align, template_letter.line_align))
-    # letter.line_align_g = 100
-
-    # MAX_SKEW = 45 # max acceptable skew of a character
-    # TRUE_HEIGHT = 90 # height of template characters (px) measured in photo software
-    # match grade.strip().lower():
-    #     case 'k':
-    #         # print('Kinder rubric selected')
-    #         letter_form_percent = 60
-    #         line_align_percent = 40
-    #         orientation_percent = 60
-    #         size_percent = 50
-    #     case '1':
-    #         # print('Grade 1 rubric selected')
-    #         letter_form_percent = 40
-    #         line_align_percent = 20
-    #         orientation_percent = 40
-    #         size_percent = 30
-    #     case '2':
-    #         letter_form_percent = 20
-    #         line_align_percent = 10
-    #         orientation_percent = 20
-    #         size_percent = 10   # changed from 5 to 10 despite rubric 
-    #                             # due to parts of template may be removed when removing grid
-            
-    # Calculate individual statuses
-    # letter.letter_form_status = (100 - letter.letter_form * 100 <= letter_form_percent)
-    # or (percentage_diff(letter.letter_form, template_letter.letter_form) <= letter_form_percent)
-    # letter.orientation_status = abs(letter.orientation) <= abs(template_letter.orientation) or (percentage_diff(letter.orientation, template_letter.orientation) <= orientation_percent)
-    # letter.orientation_status = True
-    # letter.orientation_status = (100 * (abs(letter.orientation) / MAX_SKEW)) <= orientation_percent
-    # letter.size_status = (percentage_diff(letter.size, TRUE_HEIGHT) <= size_percent) or (percentage_diff(letter.size, template_letter.size) <= size_percent)
-    # letter.line_align_status = abs(letter.line_align) <= abs(template_letter.line_align) or (percentage_diff(letter.line_align, template_letter.line_align) <= line_align_percent)
-    
-    # Combine into single grade with equal weighting
-    # statuses = [
-    #     letter.letter_form_status,
-    #     letter.orientation_status,
-    #     letter.size_status,
-    #     letter.line_align_status
-    # ]
-    #
-    # letter.overall_status = sum(statuses) / len(statuses) >= 0.5  # Returns True if 50%+ pass
-    # letter.overall_status = letter.size > 0 and letter.overall_status
-
     
 
 # resize character
 def resize_cr(img: MatLike):
+    """
+    resizes image to 28 x 28 the same dimension with the images the CNN model was trained on
+    Returns:
+        resized 28x28 image
+    """
     return cv.resize(img, (28, 28))
 
-# grid cell counter helper function
-def angle_cos(p0, p1, p2):
-    d1, d2 = (p0-p1).astype('float'), (p2-p1).astype('float')
-    return abs( np.dot(d1, d2) / np.sqrt( np.dot(d1, d1)*np.dot(d2, d2)))
-
-def get_rects(bin):
-    squares = []
-    contours, _hierarchy = cv.findContours(bin, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
-    for cnt in contours:
-        cnt_len = cv.arcLength(cnt, True)
-        cnt = cv.approxPolyDP(cnt, 0.02*cnt_len, True)
-        if len(cnt) == 4 and cv.contourArea(cnt) > 1000 and cv.isContourConvex(cnt):
-            cnt = cnt.reshape(-1, 2)
-            max_cos = np.max([angle_cos( cnt[i], cnt[(i+1) % 4], cnt[(i+2) % 4] ) for i in range(4)])
-            if max_cos < 0.1:
-                squares.append(cnt)
-    return squares
-    
-def count_rect(img: MatLike) -> int:
-    assert img is not None, "image not found"
-
-    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    
-    # Preprocess
-    blurred = cv.GaussianBlur(img, (5, 5), 0)
-    _, binary = cv.threshold(blurred, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
-    
-    # Morphological operations to clean up
-    kernel = np.ones((3, 3), np.uint8)
-    binary = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
-    binary = cv.morphologyEx(binary, cv.MORPH_OPEN, kernel)
-    
-    # Get uniform rect grids
-    squares = get_rects(binary)
-    
-    print(f"Found {len(squares)} uniform square grids")
-    
-    # Visualize
-    # output = cv.cvtColor(image, cv.COLOR_GRAY2BGR)
-    
-    # output = cv.drawContours( image, squares, -1, (0, 255, 0), 3 )
-
-    return len(squares)
-
-
 # ---------------------------- #
-# Step 1: Skew Correction
-# ---------------------------- #
-def correct_skew(image: MatLike, output_path: str) -> MatLike:
-    # image = cv.imread(input_image_path)
-    if image is None:
-        raise FileNotFoundError(f"❌ Could not load {input_image_path} for skew correction.")
-    angle = get_angle(image)
-    corrected = rotate(image, angle)
-    # cv.imwrite(output_path, corrected)
-
-    print(f"✅ Skew correction done -> {output_path}, angle: {angle}")
-
-    return image
-
-
-# ---------------------------- #
-# Step 2: SIFT Alignment
+# Step 1: SIFT Alignment
 # ---------------------------- #
 def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, output_path: str, runs: int = 5) -> MatLike:
 
@@ -821,17 +736,11 @@ def align_documents_sift(template_color: MatLike, filled_doc_color: MatLike, out
 
 
 # ---------------------------- #
-# Step 3: Perspective Correction
+# Step 2: Perspective Correction
 # ---------------------------- #
 # have to check the current image first for the existing letters or character set 
 def correct_perspective(image: MatLike, output_path: str="3_corrTab.png") -> MatLike:
     
-    # char_set = {"ABCDEFGHIJ": "./template/A-J.png",
-    #             "KLMNOPQRST": "./template/K-T.png",
-    #             "UVWXYZabcd": "./template/U-d.png",
-    #             "efghijklmn": "./template/e-n.png",
-    #             "opqrstuvwx": "./template/o-x.png",
-    #             "yz": "./template/y-z.png"}
     gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     thresh = cv.adaptiveThreshold(gray, 255,
                                    cv.ADAPTIVE_THRESH_MEAN_C,
@@ -859,14 +768,6 @@ def correct_perspective(image: MatLike, output_path: str="3_corrTab.png") -> Mat
             right_height = np.linalg.norm(rect[2] - rect[1])
             avg_height = (left_height + right_height) / 2
 
-            # 100px height per character
-            # if num_enclosed <= 12: # if number of cells is less than 60 supposedly it is assumed it is yz worksheet
-            # # have to fix this tho
-            # # Scale to desired height
-            #     scale = 200 / avg_height
-            #     width = int(top_width * scale)
-            #     height = 200
-            # else:
             height, width = thresh.shape
             width_ratio = width / height
             height = 1000
@@ -914,11 +815,10 @@ def remove_shadow(img: MatLike) -> MatLike:
 
 
 # ---------------------------- #
-# Step 4: Remove Red Lines
+# Step 3: Remove Red Lines
 # ---------------------------- #
 
 
-#after SIFT call this
 def remove_colored_lines(img_bgr: MatLike, output_path: str="done.png",
                          hsv_red_min_sat=20, lab_ab_thresh=4,
                          dilate_iters=3, inpaint_radius=1) -> MatLike:
@@ -949,7 +849,7 @@ def remove_colored_lines(img_bgr: MatLike, output_path: str="done.png",
 
 
 # ---------------------------- #
-# Step 6: Extract Valid Letter Boxes
+# Step 4: Extract Valid Letter Boxes
 # ---------------------------- #
 
 def remove_grid(img: MatLike) -> MatLike:
@@ -984,7 +884,6 @@ def eval_letters(img: MatLike, box, char_set):
     boxes = box.cells
     num_col = 6
     num_row = len(char_set)
-    unprocessed_imgs = []
     eval_preproc = []
     imgs = []
     for i in range (0, num_row):
@@ -1025,90 +924,3 @@ def eval_letters(img: MatLike, box, char_set):
     # plot_imgs(orientation_fixed, num_row, num_col)
     print(f"num_row: {num_row}  |   num_col: {num_col}")
     plot_imgs(eval_preproc, num_row, num_col, file_name='imgs')
-
-    # expects warped fix image or 3_corrTab.png
-def create_result(img: MatLike, letters, out_path: str = ""):
-    result = img
-    for letter in letters:
-        # letter.print_coords()
-        # print(f"isPass: {letter.isPass()}")
-        box = letter.box
-        x = box.x
-        y = box.y
-        w = box.w
-        h = box.h
-        if letter.is_template:
-            # print("Cont..")
-            continue
-        # if letter.isPass() and not letter.is_template:
-        #     print("Letter passed")
-
-            # print(f"x:{x}, y:{y}, w:{w}, h:{h}") 
-            # cv.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 15)
-        # else:
-        #     cv.rectangle(result, (x, y), (x+w, y+h), (255, 0, 0), 15)
-    return result
-
-
-# ---------------------------- #
-# MAIN PIPELINE
-# ---------------------------- #
-if __name__ == "__main__":
-    try:
-        template_path = "./template/A-J.png"
-        filled_doc_path = "./worksheets/A-J_size.jpg"
-
-        template_img = cv.imread(template_path)
-        ws_img = cv.imread(filled_doc_path)
-
-        imgs = []
-
-        boxes = init_boxes()
-
-        print("\n--- SIFT Alignment ---")
-        sift_aligned = align_documents_sift(template_img, ws_img, "2_sift.png")
-
-        print("\n--- Shadow Removal ---")
-
-        shadow_removed = remove_shadow(sift_aligned)
-        cv.imwrite("removed_shadow.png", shadow_removed)
-
-        # remove this update the code to parse the new template 
-        num_enclosed = count_rect(shadow_removed)
-
-        print("\n--- Perspective Correction ---")
-        num_enclosed = count_rect(sift_aligned)
-        perspective_corrected = correct_perspective(sift_aligned, num_enclosed, "3_corrTab.png")
-        grid_removed = remove_grid(perspective_corrected)
-
-        print("\n--- Remove Red Lines ---")
-        result, mask = detect_red_flexible(grid_removed, h_thresh=10, s_thresh=25, v_min=70)
-        image_processed, white_telea = white_mask_then_inpaint(grid_removed, mask, dilate_iterations=2, inpaint_radius=1, method='telea')
-
-        char_set = check_page(image_processed)
-        print(f"chars: {char_set}")
-
-        print("\n--- Eval Letters ---")
-        eval_letters(image_processed, boxes, char_set) 
-
-        # res_img = create_result(perspective_corrected, boxes.letters)
-    except Exception as e:
-        print(f"❌ Pipeline failed: {e}")
-# isolate_chars(image_processed, boxes.cells)
-
-# cleaned_telea = clean_artifacts(inpainted1_telea)
-
-# chr_isolated = img[box.y:box.y+box.h,box.x:box.x+box.w]
-# clahe_binarization(inpainted1_telea[])
-
-# print("\n --- Cycle Characters ---")
-# cycle_characters(cleaned_telea, boxes)
-
-
-
-# print("\n--- Enhance Handwriting Final ---")
-# count_enclosed(red_removed2)
-# step5 = enhance_handwriting_final(cleaned_telea, "final_clean_strokes_white_on_black.png")
-
-# print("\n✅ Pipeline complete — final outputs in 'valid_letter_boxes/'.")
-
