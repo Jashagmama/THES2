@@ -9,5 +9,6 @@ dependencies = [
     "opencv-python",
     "matplotlib",
     "pandas",
-    "scikit-image"
+    "scikit-image",
+    "tensorflow"
 ]

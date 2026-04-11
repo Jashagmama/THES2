@@ -7,7 +7,6 @@ from .box_man import *
 
 from math import ceil, floor
 from skimage.filters import threshold_sauvola
-from time import perf_counter
 
 from pathlib import Path
 from django.conf import settings
@@ -312,7 +311,6 @@ def check_page(img: MatLike):
     #     if chars[0:2].lower() == first_chars.lower():
     #         print(f"Char set found: {chars}")
     #         return chars
-    # print("Char set not found")
     first_chars = ''.join(first_chars)
     print(f'first_chars: {first_chars}')
     print(f'prob_set: {prob_set}')
@@ -353,20 +351,6 @@ def preproc_char_iso(img: MatLike, type=''):
         kernel = np.ones((3, 3), np.uint8)
         # Apply erosion
         img = cv.erode(img, kernel, iterations=1)
-    
-    # Crop to bounding box
-    # coords = cv.findNonZero(img)
-    # if coords is not None:
-    #     x, y, w, h = cv.boundingRect(coords)
-    #     img = img[y:y+h, x:x+w]
-    
-    # Add padding
-    # pad = 10
-    # img = cv.copyMakeBorder(img, pad, pad, pad, pad, 
-    #                         cv.BORDER_CONSTANT, value=0)
-
-    # Resize to square
-    # img = cv.resize(img, (28, 28))
     
     # invert again to get white bg and black fg
     img = cv.bitwise_not(img)
